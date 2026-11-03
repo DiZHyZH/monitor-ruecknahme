@@ -72,9 +72,9 @@ begin
       cond  = case when coalesce(cond,'ok') = 'ok' and coalesce(p->>'cond','ok') <> 'ok' then p->>'cond' else cond end,
       updated_at = now()
     where id = ex.id;
-    return jsonb_build_object('status','dup','id',ex.id,'by',ex.by);
+    return jsonb_build_object('status','dup','id',ex.id,'by',ex."by");
   end if;
-  insert into scans(id, rollout, asset, neu, etage, raum, buero, place, cond, note, by, ts)
+  insert into scans(id, rollout, asset, neu, etage, raum, buero, place, cond, note, "by", ts)
   values (p->>'id', p_code, p->>'asset', p->>'neu', p->>'etage', p->>'raum', p->>'buero', p->>'place',
           coalesce(p->>'cond','ok'), p->>'note', p->>'by', (p->>'ts')::bigint)
   on conflict (id) do nothing;
