@@ -105,6 +105,30 @@ li .del.arm{color:var(--bad);border-color:var(--bad)}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 8px 8px 16px;border-radius:8px;font-size:15px;z-index:20;max-width:calc(100% - 32px);display:flex;align-items:center;gap:12px}
 .toast button{background:none;border:1px solid var(--bg);color:var(--bg);border-radius:6px;padding:6px 10px;font:inherit;font-weight:600;cursor:pointer}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.listbar{display:flex;align-items:center;gap:10px;margin-top:-4px}
+.lname{flex:1;min-width:0;text-align:left;background:none;border:0;padding:6px 0;color:var(--fg);font-family:var(--f-display);font-size:16px;font-weight:600;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lname small{color:var(--muted);font-weight:400;margin-left:6px}
+.listbar .btn{min-height:40px;font-size:15px}
+.dlg{position:fixed;inset:0;z-index:50;background:rgba(10,16,22,.55);display:flex;align-items:flex-end;justify-content:center;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+.dlgbox{background:var(--surface);color:var(--fg);border-radius:14px;padding:20px;width:100%;max-width:480px;display:flex;flex-direction:column;gap:12px}
+.dlgbox h3{margin:0;font-family:var(--f-display);font-size:20px}
+.dlgbox p{margin:0;color:var(--muted);font-size:15px}
+.dlgbox input{font-family:var(--f-body);font-size:17px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px 12px;width:100%}
+.dlgact{display:flex;gap:8px;flex-wrap:wrap}
+.dlgact .btn{flex:1;min-width:120px}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.hist{position:fixed;inset:0;z-index:45;background:var(--bg);overflow-y:auto;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.hist .wrap{padding-block:16px 40px}
+.histhead{display:flex;align-items:center;gap:10px}
+.histhead h2{flex:1;margin:0;font-family:var(--f-display);font-size:22px}
+.hitem{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.hitem.active{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.hitem .hn{font-family:var(--f-display);font-size:17px;font-weight:600;overflow-wrap:anywhere}
+.hitem .hm{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.hitem .ha{display:flex;gap:6px;flex-wrap:wrap}
+.hitem .ha .btn{min-height:38px;font-size:14px;padding:0 12px;flex:1}
+.pill{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;border-radius:20px;padding:1px 8px;margin-left:6px;border:1px solid currentColor;vertical-align:1px}
+.pill.open{color:var(--accent)} .pill.done{color:var(--ok)}
 </style>
 </head><body>
 
@@ -113,6 +137,7 @@ li .del.arm{color:var(--bad);border-color:var(--bad)}
     <h1>Monitor-Rücknahme</h1>
     <div class="count" aria-live="polite"><b id="cnt">0</b> <span style="font-size:13px;color:var(--muted)">erfasst</span></div>
   </header>
+  <div class="listbar"><button type="button" class="lname" id="lname" title="Liste umbenennen">–</button><button type="button" class="btn" id="openHist">Verlauf</button></div>
   <div id="notice" class="notice" hidden></div>
 
   <div class="mode" role="group" aria-label="Modus">
@@ -183,8 +208,15 @@ li .del.arm{color:var(--bad);border-color:var(--bad)}
       </div>
     </div>
     <ol id="list"><li class="empty">Noch nichts erfasst. Erstes Asset-Label scannen, die Liste füllt sich hier.</li></ol>
+      <button class="btn dark wide" id="finish" type="button">Fertig · Liste abschliessen</button>
   </section>
 </div>
+<div id="dlg" class="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="dlgbox"><h3 id="dlgT"></h3><p id="dlgP"></p><input id="dlgI" type="text" hidden><div class="dlgact" id="dlgA"></div></div></div>
+<div id="hist" class="hist" hidden><div class="wrap">
+  <div class="histhead"><h2>Verlauf</h2><button class="btn" id="histNew" type="button">+ Neue Liste</button><button class="btn dark" id="histClose" type="button">Zurück</button></div>
+  <p class="hint">Alle Listen bleiben auf diesem Handy gespeichert. Öffnen macht sie zur aktiven Liste, dort kannst du weiter scannen oder Einträge löschen.</p>
+  <div id="histList" style="display:flex;flex-direction:column;gap:10px"></div>
+</div></div>
 <div id="toast" class="toast" hidden><span id="toastT"></span><button id="undo" type="button" hidden>Rückgängig</button></div>
 
 <script>
@@ -228,10 +260,10 @@ function render(){
   });
 }
 async function put(rec){
-  {items.push(rec);ls.set(LS,items);render()}
+  {items.push(rec);persist();render()}
 }
 async function remove(id,silent){
-  {items=items.filter(x=>x.id!==id);ls.set(LS,items);render();if(!silent)toast("Gelöscht")}
+  {items=items.filter(x=>x.id!==id);persist();render();if(!silent)toast("Gelöscht")}
 }
 const isDup=a=>items.some(x=>norm(x.asset)===norm(a));
 async function saveRec(rec,el){
@@ -311,10 +343,10 @@ $("camNew").addEventListener("change",e=>scanPhoto(e.target,$("escan"),$("epicks
 
 /* ---------- export ---------- */
 const HEAD=["Nr","Asset-ID (abgebaut)","Ersetzt durch (Asset-ID)","Etage","Raum","Bürobezeichnung","Arbeitsplatz","Zustand","Notiz","Erfasst"];
-const rows=()=>items.slice().sort((a,b)=>a.ts-b.ts).map((it,i)=>[i+1,it.asset,it.neu||"",it.etage||it.loc||"",it.raum||"",it.buero||"",it.place||"",condTxt(it.cond),it.note||"",new Date(it.ts).toLocaleString("de-CH")]);
-const xname=()=>"Monitore_abgebaut_"+new Date().toISOString().slice(0,10)+".xlsx";
-function makeXlsx(){
-  const ws=XLSX.utils.aoa_to_sheet([HEAD,...rows()]);
+const rows=(arr)=>(arr||items).slice().sort((a,b)=>a.ts-b.ts).map((it,i)=>[i+1,it.asset,it.neu||"",it.etage||it.loc||"",it.raum||"",it.buero||"",it.place||"",condTxt(it.cond),it.note||"",new Date(it.ts).toLocaleString("de-CH")]);
+const xname=(l)=>((l||activeList()||{}).name||"Monitore").replace(/[\\/:*?"<>|]+/g,"-").replace(/\s+/g,"_")+".xlsx";
+function makeXlsx(arr){
+  const ws=XLSX.utils.aoa_to_sheet([HEAD,...rows(arr)]);
   ws["!cols"]=[{wch:5},{wch:20},{wch:22},{wch:10},{wch:10},{wch:20},{wch:13},{wch:16},{wch:28},{wch:18}];
   ws["!autofilter"]={ref:ws["!ref"]};
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Abgebaut");
@@ -326,13 +358,16 @@ $("copy").onclick=async()=>{
   try{await navigator.clipboard.writeText(txt);toast("Kopiert, jetzt in Excel einfügen")}
   catch(e){const ta=document.createElement("textarea");ta.value=txt;ta.style.cssText="position:fixed;inset:20% 16px auto;height:40%;z-index:30";document.body.append(ta);ta.select();toast("Text markiert, jetzt kopieren");ta.addEventListener("blur",()=>ta.remove())}
 };
-$("csv").onclick=async()=>{
-  if(!items.length){toast("Liste ist leer");return}
-  let blob;try{blob=makeXlsx()}catch(e){toast("Excel ging nicht, nimm Kopieren");return}
-  try{const f=new File([blob],xname(),{type:blob.type});
-    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:xname()});return}}catch(e){if(e.name==="AbortError")return}
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=xname();document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);toast("Excel gespeichert");
-};
+async function exportList(l){
+  l=l||activeList();const arr=l===activeList()?items:(l.items||[]);
+  if(!arr.length){toast("Liste ist leer");return}
+  let blob;try{blob=makeXlsx(arr)}catch(e){toast("Excel ging nicht, nimm Kopieren");return}
+  const fn=xname(l);
+  try{const f=new File([blob],fn,{type:blob.type});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:fn});return}}catch(e){if(e.name==="AbortError")return}
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=fn;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);toast("Excel gespeichert");
+}
+$("csv").onclick=()=>exportList();
 
 
 /* ---------- Auto-Enter: scanner / keyboard-scan input saves itself ---------- */
@@ -387,10 +422,87 @@ $("gal").addEventListener("change",async e=>{
 });
 $("galOld").addEventListener("change",e=>scanPhoto(e.target,$("escan"),$("epicks"),c=>{$("eOld").value=clean(c);checkExt();state(isDup(c)?c+" ist schon in der Liste.":"Alter Monitor erkannt."+($("eNew").value?"":" Jetzt den neuen scannen."),isDup(c)?"warn":"ok",$("escan"))}));
 $("galNew").addEventListener("change",e=>scanPhoto(e.target,$("escan"),$("epicks"),c=>{$("eNew").value=clean(c);checkExt();state("Neuer Monitor erkannt."+($("eOld").value?" Ort prüfen, dann speichern.":" Jetzt den alten scannen."),"ok",$("escan"))}));
+
+/* ---------- Listen & Verlauf ---------- */
+let lists=[], activeId=null;
+const LSL=LS+"-lists";
+const activeList=()=>lists.find(l=>l.id===activeId);
+const fmtDay=ts=>new Date(ts).toLocaleString("de-CH",{day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit"});
+function persist(){const a=activeList();if(a){a.items=items;a.updated=Date.now()}ls.set(LSL,{lists,activeId})}
+function uniqName(n){if(!lists.some(l=>l.name===n))return n;let i=2;while(lists.some(l=>l.name===n+" ("+i+")"))i++;return n+" ("+i+")"}
+function newList(name){const d=new Date();const l={id:"l"+Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:uniqName(name||("Rücknahme "+d.toLocaleDateString("de-CH"))),created:Date.now(),updated:Date.now(),closed:null,items:[]};lists.push(l);return l}
+function showName(){const a=activeList();$("lname").innerHTML="";$("lname").append(document.createTextNode((a?a.name:"–")+" ✎"))}
+function openList(id){persist();const l=lists.find(x=>x.id===id);if(!l)return;l.closed=null;activeId=id;items=(l.items||[]).slice();persist();showName();render();checkExt()}
+function startNew(name){persist();const l=newList(name);activeId=l.id;items=[];persist();showName();render();checkExt()}
+
+/* in-page dialog (no browser confirm) */
+function ask(title,text,buttons,input){
+  $("dlgT").textContent=title;$("dlgP").textContent=text||"";$("dlgP").hidden=!text;
+  const inp=$("dlgI");inp.hidden=input==null;if(input!=null){inp.value=input;setTimeout(()=>{inp.focus();inp.select()},50)}
+  const act=$("dlgA");act.innerHTML="";
+  buttons.forEach(b=>{const el=document.createElement("button");el.type="button";el.className="btn "+(b.cls||"");el.textContent=b.label;el.onclick=()=>{$("dlg").hidden=true;b.fn&&b.fn(inp.value.trim())};act.append(el)});
+  $("dlg").hidden=false;
+}
+$("dlg").addEventListener("click",e=>{if(e.target.id==="dlg")$("dlg").hidden=true});
+inpEnter($("dlgI"));function inpEnter(i){i.addEventListener("keydown",e=>{if(e.key==="Enter"){const b=$("dlgA").lastElementChild;b&&b.click()}})}
+
+function rename(l){ask("Liste umbenennen","Zum Beispiel Kunde, Gebäude oder Auftrag.",[{label:"Abbrechen"},{label:"Speichern",cls:"dark",fn:v=>{if(!v)return;l.name=v;persist();showName();renderHist()}}],l.name)}
+$("lname").onclick=()=>{const a=activeList();if(a)rename(a)};
+
+$("finish").onclick=()=>{
+  const a=activeList();
+  if(!items.length){toast("Liste ist noch leer");return}
+  const ext=items.filter(x=>x.neu).length;
+  ask("Wirklich alles erfasst?",
+    items.length+" Monitor"+(items.length===1?"":"e")+" in «"+a.name+"»"+(ext?" ("+ext+" mit Ersatzgerät)":"")+". Danach wird die Liste abgeschlossen und im Verlauf gespeichert. Du kannst sie jederzeit wieder öffnen.",
+    [{label:"Zurück"},{label:"Ja, abschliessen",cls:"dark",fn:()=>{
+      a.closed=Date.now();persist();const done=a;startNew();
+      toast("«"+done.name+"» abgeschlossen");
+      ask("Liste abgeschlossen","Excel jetzt exportieren? Du findest die Liste auch später im Verlauf.",[{label:"Später"},{label:"Excel exportieren",cls:"dark",fn:()=>exportList(done)}]);
+    }}]);
+};
+
+function renderHist(){
+  const box=$("histList");box.innerHTML="";
+  lists.slice().sort((a,b)=>(b.updated||0)-(a.updated||0)).forEach(l=>{
+    const n=l.id===activeId?items.length:(l.items||[]).length;
+    const d=document.createElement("div");d.className="hitem"+(l.id===activeId?" active":"");
+    const h=document.createElement("div");h.className="hn";h.textContent=l.name;
+    const pill=document.createElement("span");pill.className="pill "+(l.closed?"done":"open");pill.textContent=l.id===activeId?"aktiv":l.closed?"abgeschlossen":"offen";h.append(pill);
+    const m=document.createElement("div");m.className="hm";m.textContent=n+" Monitor"+(n===1?"":"e")+" · erstellt "+fmtDay(l.created)+(l.closed?" · abgeschlossen "+fmtDay(l.closed):" · zuletzt "+fmtDay(l.updated||l.created));
+    const ac=document.createElement("div");ac.className="ha";
+    const mk=(t,c,fn)=>{const b=document.createElement("button");b.type="button";b.className="btn "+(c||"");b.textContent=t;b.onclick=fn;ac.append(b)};
+    if(l.id!==activeId)mk("Öffnen","dark",()=>{openList(l.id);$("hist").hidden=true;toast("«"+l.name+"» geöffnet")});
+    mk("Excel","",()=>exportList(l));
+    mk("Umbenennen","",()=>rename(l));
+    mk("Löschen","danger",()=>ask("Liste löschen?","«"+l.name+"» mit "+n+" Einträgen wird endgültig gelöscht.",[{label:"Abbrechen"},{label:"Löschen",cls:"danger",fn:()=>{
+      lists=lists.filter(x=>x.id!==l.id);
+      if(l.id===activeId){const open=lists.filter(x=>!x.closed).sort((a,b)=>b.updated-a.updated)[0];if(open){activeId=open.id;items=(open.items||[]).slice()}else{activeId=null;items=[];startNew();}}
+      persist();showName();render();renderHist();toast("Liste gelöscht")}}]));
+    d.append(h,m,ac);box.append(d);
+  });
+}
+$("openHist").onclick=()=>{persist();renderHist();$("hist").hidden=false;$("hist").scrollTop=0};
+$("histClose").onclick=()=>{$("hist").hidden=true};
+$("histNew").onclick=()=>ask("Neue Liste","Name für die neue Liste:",[{label:"Abbrechen"},{label:"Anlegen",cls:"dark",fn:v=>{startNew(v||undefined);$("hist").hidden=true;toast("Neue Liste angelegt")}}],"Rücknahme "+new Date().toLocaleDateString("de-CH"));
+
+/* Entwurf im Erweitert-Formular sichern */
+const DRAFT=["eOld","eNew","ePlace","eNote"];
+DRAFT.forEach(id=>$(id).addEventListener("input",()=>{const d={};DRAFT.forEach(k=>d[k]=$(k).value);d.cond=cond;ls.set(LS+"-draft",d)}));
+$("ext").addEventListener("submit",()=>setTimeout(()=>{if(!$("eOld").value)ls.set(LS+"-draft",{})},300));
+function loadDraft(){const d=ls.get(LS+"-draft",{})||{};DRAFT.forEach(k=>{if(d[k])$(k).value=d[k]});if(d.cond)setCond(d.cond)}
+document.addEventListener("visibilitychange",()=>{if(document.hidden)persist()});
+window.addEventListener("pagehide",persist);
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 (function boot(){
   {const l=ls.get(LS+"-loc",{})||{};$("eFloor").value=l.etage||"";$("eRoom").value=l.raum||"";$("eOffice").value=l.buero||""}
   setMode(ls.get(LS+"-mode","quick"));
-  items=ls.get(LS,[]);render();
+  const st=ls.get(LSL,null);
+  if(st&&Array.isArray(st.lists)&&st.lists.length){lists=st.lists;activeId=st.activeId}
+  else{const l=newList();l.items=ls.get(LS,[])||[];lists=[l];activeId=l.id}
+  let a=activeList();
+  if(!a||a.closed){const open=lists.filter(x=>!x.closed).sort((x,y)=>y.updated-x.updated)[0];if(open)a=open;else a=newList();activeId=a.id}
+  items=(a.items||[]).slice();persist();showName();render();loadDraft();checkExt();
   if(!ls.ok()){$("notice").hidden=false;$("notice").textContent="Dieser Browser speichert nichts. Datei in Chrome öffnen, nicht in einer Vorschau."}
 })();
 </script>
