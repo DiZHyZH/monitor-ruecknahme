@@ -129,12 +129,17 @@ li .del.arm{color:var(--bad);border-color:var(--bad)}
 .hitem .ha .btn{min-height:38px;font-size:14px;padding:0 12px;flex:1}
 .pill{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;border-radius:20px;padding:1px 8px;margin-left:6px;border:1px solid currentColor;vertical-align:1px}
 .pill.open{color:var(--accent)} .pill.done{color:var(--ok)}
+.logo{flex:none;display:flex;align-items:center;background:#fff;border-radius:6px;padding:3px 5px}
+.logo img{display:block;height:24px;width:auto}
+.credit{margin-top:8px;padding-top:14px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.credit img{height:22px;width:auto;background:#fff;border-radius:4px;padding:2px 4px}
+.credit b{color:var(--fg);font-weight:600}
 </style>
 </head><body>
 
 <div class="wrap">
   <header>
-    <h1>Monitor-Rücknahme</h1>
+    <span class="logo"><img src="dplan-logo.png" alt="dplan IT Services" width="76" height="30"></span><h1>Monitor-Rücknahme</h1>
     <div class="count" aria-live="polite"><b id="cnt">0</b> <span style="font-size:13px;color:var(--muted)">erfasst</span></div>
   </header>
   <div class="listbar"><button type="button" class="lname" id="lname" title="Liste umbenennen">–</button><button type="button" class="btn" id="openHist">Verlauf</button></div>
@@ -210,6 +215,7 @@ li .del.arm{color:var(--bad);border-color:var(--bad)}
     <ol id="list"><li class="empty">Noch nichts erfasst. Erstes Asset-Label scannen, die Liste füllt sich hier.</li></ol>
       <button class="btn dark wide" id="finish" type="button">Fertig · Liste abschliessen</button>
   </section>
+  <footer class="credit"><img src="dplan-logo.png" alt="dplan IT Services"><span>Entwickelt von <b>Marco van der Ploeg</b></span></footer>
 </div>
 <div id="dlg" class="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="dlgbox"><h3 id="dlgT"></h3><p id="dlgP"></p><input id="dlgI" type="text" hidden><div class="dlgact" id="dlgA"></div></div></div>
 <div id="hist" class="hist" hidden><div class="wrap">
