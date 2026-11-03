@@ -428,3 +428,18 @@ do $$ declare f text; begin
     execute format('grant execute on function public.%s to authenticated', f);
   end loop;
 end $$;
+
+-- ===== Erster Admin: Marco van der Ploeg =====
+-- Läuft nur, solange es noch keinen Admin gibt. Sonst wird nichts verändert.
+do $$ begin
+  if not exists (select 1 from public.profiles where role = 'admin') then
+    update public.profiles set role = 'admin' where name ilike '%van der ploeg%';
+    if not found then
+      -- Fallback: das älteste Konto (wer sich zuerst registriert hat)
+      update public.profiles set role = 'admin' where id = (select id from public.profiles order by created_at limit 1);
+    end if;
+  end if;
+end $$;
+
+-- Zur Kontrolle: alle Konten mit Rolle anzeigen
+select name, email, role from public.profiles order by created_at;
