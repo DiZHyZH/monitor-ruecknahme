@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0090d4">
+<title>Anleitung · Monitor-Rücknahme</title>
+<link rel="icon" href="icon-192.png">
+<style>
+[hidden]{display:none!important}
+:root{
+  --bg:#eef2f6; --surface:#ffffff; --surface-2:#f6f8fb; --fg:#0e1a24; --muted:#647487; --line:#e1e7ee;
+  --accent:#0090d4; --accent-strong:#0077b3; --accent-soft:#e1f2fb; --ok:#14804a; --ok-soft:#e3f4ea; --warn:#a85f00; --warn-soft:#fdf1df;
+  --shadow:0 1px 2px rgba(14,26,36,.05),0 6px 20px rgba(14,26,36,.06);
+  --f:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; --mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b1219; --surface:#141e28; --surface-2:#1a2632; --fg:#e8eef4; --muted:#8fa0b2; --line:#243342;
+  --accent:#2fb0ec; --accent-strong:#5cc3f2; --accent-soft:#11324a; --ok:#4cc184; --ok-soft:#123224; --warn:#eaa743; --warn-soft:#3a2a10;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.wrap{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 56px;display:flex;flex-direction:column;gap:14px}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);margin:0 calc(-1*max(16px,env(safe-area-inset-left,0px)));padding:10px max(16px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:10px}
+.logo{flex:none;background:#fff;border-radius:8px;padding:4px 6px;box-shadow:0 0 0 1px var(--line);display:flex}
+.logo img{height:22px;width:auto;display:block}
+header b{flex:1;font-size:17px}
+.back{background:var(--accent);color:#fff;text-decoration:none;font-weight:600;font-size:14px;border-radius:999px;padding:8px 14px}
+h1{font-size:28px;line-height:1.15;letter-spacing:-.02em;margin:18px 0 0;text-wrap:balance}
+.lead{color:var(--muted);margin:0;max-width:60ch}
+nav{display:flex;flex-wrap:wrap;gap:6px}
+nav a{font-size:13.5px;font-weight:600;color:var(--accent-strong);background:var(--accent-soft);text-decoration:none;border-radius:999px;padding:6px 12px}
+section{background:var(--surface);border-radius:18px;padding:18px;box-shadow:var(--shadow);scroll-margin-top:70px}
+section h2{margin:0 0 4px;font-size:19px;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+section h2 .ic{flex:none;width:32px;height:32px;border-radius:10px;background:var(--accent-soft);color:var(--accent-strong);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800}
+section > p{color:var(--muted);margin:0 0 10px}
+ol.steps{list-style:none;counter-reset:s;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start}
+ol.steps li::before{content:counter(s);width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+ul{margin:8px 0 0;padding-left:20px}
+ul li{margin:4px 0}
+b,strong{font-weight:650}
+code,.k{font-family:var(--mono);font-size:.9em;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;overflow-wrap:anywhere}
+.ui{font-weight:650;color:var(--accent-strong)}
+.box{border-radius:12px;padding:12px 14px;margin-top:12px;font-size:15px}
+.box.tip{background:var(--ok-soft)} .box.tip b:first-child{color:var(--ok)}
+.box.warn{background:var(--warn-soft)} .box.warn b:first-child{color:var(--warn)}
+.roles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+@media (max-width:520px){.roles{grid-template-columns:1fr}}
+.role{background:var(--surface-2);border-radius:12px;padding:12px 14px}
+.role h3{margin:0 0 6px;font-size:15px}
+.role ol{margin:0;padding-left:18px;font-size:15px}
+.role li{margin:3px 0}
+.status{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.status div{display:flex;gap:10px;align-items:center;font-size:15px}
+.dot{flex:none;width:10px;height:10px;border-radius:50%}
+.dot.on{background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)} .dot.wait{background:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)} .dot.off{background:var(--muted)}
+details{border-top:1px solid var(--line);padding:10px 0}
+details:first-of-type{border-top:0}
+summary{cursor:pointer;font-weight:650;list-style:none;display:flex;justify-content:space-between;gap:10px}
+summary::after{content:"+";color:var(--accent);font-weight:800}
+details[open] summary::after{content:"–"}
+details p,details ul{margin:6px 0 0;color:var(--muted)}
+footer{text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px}
+footer b{color:var(--fg)}
+a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+</style></head><body>
+<div class="wrap">
+  <header><span class="logo"><img src="dplan-logo.png" alt="dplan IT Services"></span><b>Anleitung</b><a class="back" href="./">Zur App</a></header>
+
+  <h1>Monitor-Rücknahme in 5 Minuten</h1>
+  <p class="lead">Abgebaute Monitore per Asset-ID erfassen, allein oder im Team, und am Schluss als Excel-Liste exportieren.</p>
+  <nav>
+    <a href="#installieren">Installieren</a><a href="#scannen">Scannen</a><a href="#erweitert">Erweitert</a><a href="#listen">Listen &amp; Excel</a><a href="#team">Team-Rollout</a><a href="#probleme">Probleme</a>
+  </nav>
+
+  <section id="installieren">
+    <h2><span class="ic">1</span>App installieren</h2>
+    <p>Einmalig, dauert 30 Sekunden.</p>
+    <ol class="steps">
+      <li><span><code>dizhyzh.github.io/monitor-ruecknahme</code> in <b>Chrome</b> öffnen, nicht in Samsung Internet.</span></li>
+      <li><span>Oben rechts <span class="ui">⋮</span> und dann <span class="ui">App installieren</span> oder <span class="ui">Zum Startbildschirm hinzufügen</span>.</span></li>
+      <li><span>Die App ab jetzt über das blaue Barcode-Icon starten. Nach dem ersten Öffnen läuft sie auch ohne Internet.</span></li>
+    </ol>
+  </section>
+
+  <section id="scannen">
+    <h2><span class="ic">2</span>Schnell scannen</h2>
+    <p>Der Standard-Modus. Ein Foto pro Monitor reicht.</p>
+    <ol class="steps">
+      <li><span>Auf <span class="ui">Asset-ID scannen</span> tippen. Die Kamera geht auf.</span></li>
+      <li><span>Das Asset-Label scharf und gerade fotografieren. Der Code wird erkannt und <b>sofort gespeichert</b>.</span></li>
+      <li><span>Nächster Monitor. Unten zählt die Liste mit, der neueste Eintrag ist blau markiert.</span></li>
+    </ol>
+    <ul>
+      <li><span class="ui">Aus Galerie</span>: Fotos von vorhin auf einmal einlesen, auch mehrere.</li>
+      <li><b>Eintippen</b> geht auch, dann mit <span class="ui">Speichern</span> oder Enter bestätigen.</li>
+      <li><b>Auto-Enter</b>: Mit einem Handscanner oder der Scan-Funktion der Tastatur wird der Code direkt gespeichert.</li>
+      <li><b>Falsch gescannt?</b> Unten erscheint ein paar Sekunden <span class="ui">Rückgängig</span>. Sonst in der Liste auf <span class="ui">Löschen</span>, dann <span class="ui">Sicher?</span>.</li>
+      <li><b>Doppelt gescannt?</b> Die App merkt es und speichert nichts.</li>
+    </ul>
+  </section>
+
+  <section id="erweitert">
+    <h2><span class="ic">3</span>Erweitert: mit Ort und Ersatzgerät</h2>
+    <p>Oben auf <span class="ui">Erweitert</span> umschalten, wenn ihr dokumentieren müsst, wo was getauscht wurde.</p>
+    <ol class="steps">
+      <li><span><b>Abgebaut</b>: Asset-ID vom alten Monitor scannen. Der Cursor springt danach zu «Ersetzt durch».</span></li>
+      <li><span><b>Ersetzt durch</b>: Asset-ID vom neuen Monitor scannen.</span></li>
+      <li><span>Etage, Raum, Bürobezeichnung und Arbeitsplatz ausfüllen, dazu Zustand und Notiz, falls nötig.</span></li>
+      <li><span><span class="ui">Speichern</span>. Etage, Raum und Büro bleiben stehen, für den nächsten Platz im gleichen Raum.</span></li>
+    </ol>
+  </section>
+
+  <section id="listen">
+    <h2><span class="ic">4</span>Listen, Verlauf und Excel</h2>
+    <ul>
+      <li>Alles wird <b>sofort gespeichert</b>. App schliessen ist kein Problem.</li>
+      <li>Oben auf den <b>Listennamen</b> tippen, um ihn umzubenennen, z. B. nach Kunde oder Gebäude.</li>
+      <li><span class="ui">Excel / Teilen</span> erstellt eine .xlsx mit allen Spalten und schickt sie direkt per Mail, Teams oder OneDrive.</li>
+      <li><span class="ui">Fertig · Liste abschliessen</span> fragt nach, ob wirklich alles erfasst ist, speichert die Liste im Verlauf und startet eine neue.</li>
+      <li><span class="ui">Verlauf</span> zeigt alle Listen. Dort kannst du sie <b>öffnen</b> und weiterbearbeiten, als Excel exportieren, umbenennen oder löschen.</li>
+    </ul>
+  </section>
+
+  <section id="team">
+    <h2><span class="ic">5</span>Team-Rollout: alle in einer Liste</h2>
+    <p>Mehrere Leute im Einsatz? Alle melden sich mit dem gleichen <b>Rollout-Titel</b> und <b>PIN</b> an und sehen live dieselbe Liste.</p>
+    <div class="roles">
+      <div class="role"><h3>Leader</h3><ol>
+        <li><span class="ui">Team-Login</span> antippen.</li>
+        <li>Neuen Titel eingeben, z. B. <code>HWLC_VBZ_2026_11_03</code>.</li>
+        <li>PIN wählen (mind. 4 Zeichen) und Namen eingeben.</li>
+        <li><span class="ui">Beitreten</span>. Damit ist der Rollout angelegt.</li>
+        <li>Titel und PIN ans Team geben.</li>
+      </ol></div>
+      <div class="role"><h3>Kollegen</h3><ol>
+        <li><span class="ui">Team-Login</span> antippen.</li>
+        <li>Gleichen Titel und PIN eingeben, plus eigenen Namen.</li>
+        <li><span class="ui">Beitreten</span> und normal scannen.</li>
+      </ol></div>
+    </div>
+    <div class="status">
+      <div><span class="dot on"></span><span><b>Grün</b>: Live verbunden. Scans erscheinen nach wenigen Sekunden bei allen.</span></div>
+      <div><span class="dot wait"></span><span><b>Orange</b>: Kein Netz oder noch nicht hochgeladen. Weiterscannen, das wird automatisch nachgeholt.</span></div>
+    </div>
+    <ul>
+      <li>Hat ein Kollege den Monitor schon erfasst, kommt <b>«… hat Luca schon erfasst»</b>. Deine Zusatzinfos wie Raum oder Zustand werden beim bestehenden Eintrag ergänzt.</li>
+      <li>In Excel zeigt die Spalte <b>«Erfasst von»</b>, wer welchen Monitor gescannt hat.</li>
+      <li>Am Schluss exportiert <b>einer</b> die Liste als Excel. Alle anderen müssen nichts machen.</li>
+      <li>Über <span class="ui">Team</span> meldest du dich ab oder wechselst den Rollout. Ohne Login läuft die App nur lokal auf deinem Handy.</li>
+    </ul>
+    <div class="box warn"><b>Wichtig:</b> PIN nur im Team teilen, nicht in Gruppen-Chats mit Externen. Für jeden Einsatz einen neuen Titel verwenden.</div>
+    <div class="box tip"><b>Ohne Internet im Team?</b> Unten im Bereich «Team» schickt <span class="ui">An Leader senden</span> deine Scans als QR-Code oder Datei. Der Leader sammelt sie mit <span class="ui">Vom Team einsammeln</span> ein, Doppelte werden herausgefiltert.</div>
+  </section>
+
+  <section id="probleme">
+    <h2><span class="ic">?</span>Wenn etwas nicht klappt</h2>
+    <details><summary>Barcode wird nicht erkannt</summary><p>Näher ran, Handy gerade halten, Blitz aus (der spiegelt). Nur ein Label im Bild. Notfalls die Asset-ID eintippen.</p></details>
+    <details><summary>Kamera zeigt nur schwarz</summary><ul><li>App in <b>Chrome</b> öffnen, nicht Samsung Internet.</li><li>Schnellmenü: Kachel <b>Kamerazugriff</b> einschalten.</li><li>Einstellungen → Apps → Chrome → Berechtigungen → Kamera erlauben.</li></ul></details>
+    <details><summary>Neue Funktion fehlt nach einem Update</summary><p>App ganz schliessen (aus den letzten Apps wegwischen) und neu öffnen. Bei Bedarf zweimal. Die Scans bleiben erhalten.</p></details>
+    <details><summary>«Falscher PIN»</summary><p>Titel und PIN beim Leader nachfragen. Gross-/Kleinschreibung beim Titel beachten.</p></details>
+    <details><summary>Wo sind meine Daten?</summary><p>Ohne Team-Login nur auf deinem Handy. Mit Team-Login zusätzlich in der Datenbank des Rollouts (Supabase, Frankfurt), dort nur mit Titel und PIN lesbar.</p></details>
+  </section>
+
+  <footer>Entwickelt von <b>Marco van der Ploeg</b> · dplan IT Services</footer>
+</div>
+</body></html>
