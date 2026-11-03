@@ -232,13 +232,15 @@ li .del.arm{color:var(--bad);background:var(--bad-soft);font-weight:700}
 .trow input.p{font-family:var(--f-mono);font-weight:600}
 .trow button{height:40px;border:0;border-radius:10px;background:var(--bad-soft);color:var(--bad);font-size:18px;font-weight:700;cursor:pointer}
 .trhead{display:grid;grid-template-columns:92px 1fr 40px;gap:8px}
+.avatar{flex:none;width:36px;height:36px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-fg);font-weight:800;font-size:15px;cursor:pointer}
+#auth{z-index:58}
 </style>
 </head><body>
 
 <div class="wrap">
   <header>
     <span class="logo"><img src="dplan-logo.png" alt="dplan IT Services" width="76" height="30"></span><h1>Monitor-Rücknahme</h1>
-    <div class="count" aria-live="polite"><b id="cnt">0</b> <span style="font-size:13px;color:var(--muted)">erfasst</span></div>
+    <button type="button" class="avatar" id="meBtn" aria-label="Profil" hidden>?</button><div class="count" aria-live="polite"><b id="cnt">0</b> <span style="font-size:13px;color:var(--muted)">erfasst</span></div>
   </header>
   <div class="listbar"><button type="button" class="lname" id="lname" title="Liste">–</button><button type="button" class="btn" id="teamBtn">Team-Login</button><button type="button" class="btn" id="openHist">Verlauf</button></div>
   <div id="syncline" class="syncline" hidden></div>
@@ -336,13 +338,31 @@ li .del.arm{color:var(--bad);background:var(--bad-soft);font-weight:700}
 </div></div>
 <input id="impFile" class="cam" type="file" accept=".json,application/json,text/plain" multiple>
 <input id="impQR" class="cam" type="file" accept="image/*" multiple>
+<div id="auth" class="login" hidden><div class="wrap">
+  <div class="brand"><img src="dplan-logo.png" alt="dplan IT Services"></div>
+  <div><h2 id="auTitle">Anmelden</h2><p id="auLead">Mit deiner E-Mail und deinem PIN. Du bleibst angemeldet, auch offline.</p></div>
+  <div class="mode" role="group" aria-label="Anmelden oder registrieren" id="auTabs">
+    <button type="button" id="auTabIn" aria-pressed="true">Anmelden</button>
+    <button type="button" id="auTabUp" aria-pressed="false">Konto erstellen</button>
+  </div>
+  <form class="card" id="auForm" autocomplete="on">
+    <div class="fld" id="auNameF" hidden><label class="lb" for="auName">Dein Name</label><input id="auName" type="text" autocomplete="name" placeholder="Vorname Nachname"></div>
+    <div class="fld" id="auMailF"><label class="lb" for="auMail">E-Mail</label><input id="auMail" type="email" autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="vorname.nachname@firma.ch"></div>
+    <div class="fld"><label class="lb" for="auPin" id="auPinL">PIN</label><input id="auPin" class="code" type="password" inputmode="numeric" autocomplete="current-password" placeholder="mind. 6 Ziffern"></div>
+    <div class="fld" id="auPin2F" hidden><label class="lb" for="auPin2">PIN wiederholen</label><input id="auPin2" class="code" type="password" inputmode="numeric" autocomplete="new-password"></div>
+    <div class="err" id="auErr" aria-live="polite"></div>
+    <button class="btn dark wide" type="submit" id="auGo">Anmelden</button>
+    <button class="btn" type="button" id="auForgot" style="background:none;color:var(--accent-strong);min-height:36px">PIN vergessen?</button>
+  </form>
+  <a class="btn wide helpbtn" href="anleitung.html">Anleitung lesen</a>
+</div></div>
 <div id="login" class="login" hidden><div class="wrap">
   <div class="brand"><img src="dplan-logo.png" alt="dplan IT Services"></div>
-  <div><h2>Team-Rollout</h2><p>Alle mit dem gleichen Rollout-Titel und PIN sehen live die gleiche Liste, egal von welchem Gerät.</p></div>
+  <div><h2>Team-Rollout</h2><p>Alle mit dem gleichen Rollout-Titel und Rollout-PIN sehen live die gleiche Liste, egal von welchem Gerät. Das ist ein eigener PIN pro Einsatz, nicht dein Konto-PIN.</p></div>
   <form class="card" id="loginForm" autocomplete="off">
     <div class="fld"><label class="lb" for="lgCode">Rollout-Titel</label><input id="lgCode" class="code" type="text" autocapitalize="characters" spellcheck="false" placeholder="z. B. HWLC_VBZ_2026_11_03"></div>
-    <div class="fld"><label class="lb" for="lgPin">PIN</label><input id="lgPin" class="code" type="text" inputmode="numeric" autocomplete="off" placeholder="mind. 4 Zeichen, vom Leader"></div>
-    <div class="fld"><label class="lb" for="lgName">Dein Name</label><input id="lgName" type="text" autocomplete="name" placeholder="z. B. Marco"></div>
+    <div class="fld"><label class="lb" for="lgPin">Rollout-PIN</label><input id="lgPin" class="code" type="text" inputmode="numeric" autocomplete="off" placeholder="mind. 4 Zeichen, vom Leader"></div>
+    <div class="fld" hidden><label class="lb" for="lgName">Dein Name</label><input id="lgName" type="text" autocomplete="name"></div>
     <div class="err" id="lgErr" aria-live="polite"></div>
     <button class="btn dark wide" type="submit" id="lgGo">Beitreten</button>
     <p class="hint">Gibt es den Titel noch nicht, wird der Rollout mit diesem PIN neu angelegt. Den PIN dann im Team teilen.</p>
@@ -2936,7 +2956,7 @@ window.addEventListener("pagehide",persist);
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 
 /* ---------- Team: senden & einsammeln ---------- */
-const myName=()=>ls.get(LS+"-me","")||"";
+const myName=()=>(session&&session.user&&session.user.name)||ls.get(LS+"-me","")||"";
 function needName(then){
   if(myName())return then(myName());
   ask("Wie heisst du?","Dein Name steht beim Leader bei jedem Gerät, das du erfasst hast.",[{label:"Abbrechen"},{label:"Weiter",cls:"dark",fn:v=>{if(!v)return;ls.set(LS+"-me",v);items.forEach(x=>{if(!x.by)x.by=v});persist();then(v)}}],"");
@@ -3023,7 +3043,8 @@ let queue=ls.get(LS+"-queue",[]);            // pending ops
 let lastSync=ls.get(LS+"-since","1970-01-01T00:00:00Z"), syncOk=0, syncTimer=null, syncing=false;
 const teamActive=()=>!!(team&&activeList()&&activeList().team===team.code);
 async function rpc(fn,body){
-  const r=await fetch(SB_URL+"/rest/v1/rpc/"+fn,{method:"POST",headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const tok=await ensureToken();
+  const r=await fetch(SB_URL+"/rest/v1/rpc/"+fn,{method:"POST",headers:{"apikey":SB_KEY,"Authorization":"Bearer "+(tok||SB_KEY),"Content-Type":"application/json"},body:JSON.stringify(body)});
   const t=await r.text();let j=null;try{j=t?JSON.parse(t):null}catch(e){}
   if(!r.ok){const m=(j&&(j.message||j.hint))||("HTTP "+r.status);const e=new Error(m);e.status=r.status;throw e}
   return j;
@@ -3089,7 +3110,7 @@ function logout(keepList){
   persist();showName();render();syncBadge();
 }
 function showLogin(){
-  $("lgCode").value=team?team.code:"";$("lgPin").value="";$("lgName").value=(team&&team.name)||myName();$("lgErr").textContent="";
+  $("lgCode").value=team?team.code:"";$("lgPin").value="";$("lgName").value=myName();$("lgErr").textContent="";
   $("login").hidden=false;setTimeout(()=>$(team?"lgPin":"lgCode").focus(),100);
 }
 $("loginForm").addEventListener("submit",async e=>{
@@ -3167,6 +3188,101 @@ $("typesBtn").onclick=()=>{renderTypeRows();$("types").hidden=false;$("types").s
 $("typesClose").onclick=()=>{saveTypes();$("types").hidden=true};
 $("typeAdd").onclick=()=>{TYPES.push({p:"",t:""});renderTypeRows();const ins=$("typeRows").querySelectorAll(".trow input.p");ins[ins.length-1].focus()};
 $("typeReset").onclick=()=>ask("Standard wiederherstellen?","Deine eigenen Regeln werden durch die Standardliste ersetzt.",[{label:"Abbrechen"},{label:"Wiederherstellen",cls:"dark",fn:()=>{TYPES=TYPES_DEFAULT.map(x=>({...x}));saveTypes();renderTypeRows()}}]);
+
+/* ---------- Benutzerkonto (Supabase Auth, E-Mail + PIN) ---------- */
+let session=ls.get(LS+"-session",null);   // {access_token,refresh_token,expires_at,user:{id,email,name}}
+let auMode="in", recoveryToken=null;
+function setSession(d){
+  if(!d||!d.access_token){session=null;ls.set(LS+"-session",null);return}
+  const u=d.user||(session&&session.user)||{};
+  session={access_token:d.access_token,refresh_token:d.refresh_token||(session&&session.refresh_token),expires_at:d.expires_at||Math.floor(Date.now()/1000)+(d.expires_in||3600),
+    user:{id:u.id,email:u.email,name:(u.user_metadata&&u.user_metadata.name)||u.name||""}};
+  ls.set(LS+"-session",session);ls.set(LS+"-me",session.user.name);showMe();
+}
+async function authCall(path,body,method,token){
+  const r=await fetch(SB_URL+"/auth/v1/"+path,{method:method||"POST",headers:{"apikey":SB_KEY,"Content-Type":"application/json",...(token?{"Authorization":"Bearer "+token}:{})},body:body?JSON.stringify(body):undefined});
+  const t=await r.text();let j=null;try{j=t?JSON.parse(t):null}catch(e){}
+  if(!r.ok){const e=new Error((j&&(j.msg||j.error_description||j.message||j.error_code))||("HTTP "+r.status));e.code=j&&(j.error_code||j.code);e.status=r.status;throw e}
+  return j;
+}
+let refreshing=null;
+async function ensureToken(){
+  if(!session)return null;
+  if(session.expires_at-Date.now()/1000>90)return session.access_token;
+  if(!refreshing)refreshing=authCall("token?grant_type=refresh_token",{refresh_token:session.refresh_token}).then(d=>{setSession(d);return session.access_token}).catch(e=>{if(e.status===400||e.status===401){toast("Bitte neu anmelden");signOut(true)}throw e}).finally(()=>refreshing=null);
+  return refreshing;
+}
+function auErr(e){
+  const m=(e&&(e.code||e.message)||"")+"";
+  if(/invalid_credentials|Invalid login/i.test(m))return "E-Mail oder PIN stimmt nicht.";
+  if(/user_already_exists|already registered/i.test(m))return "Für diese E-Mail gibt es schon ein Konto. Bitte anmelden.";
+  if(/weak_password|at least|Password should/i.test(m))return "PIN zu kurz: mindestens 6 Ziffern.";
+  if(/email_not_confirmed/i.test(m))return "E-Mail ist noch nicht bestätigt. In Supabase die Bestätigung ausschalten.";
+  if(/over_email_send_rate_limit|rate limit/i.test(m))return "Zu viele Versuche. Bitte ein paar Minuten warten.";
+  if(/validation_failed|invalid.*email|email_address_invalid/i.test(m))return "Diese E-Mail-Adresse ist ungültig.";
+  if(/signup_disabled/i.test(m))return "Registrieren ist gerade ausgeschaltet.";
+  if(/Failed to fetch|NetworkError|Load failed/i.test(m))return "Keine Verbindung. Für die Anmeldung braucht es einmal Internet.";
+  return "Hat nicht geklappt: "+m;
+}
+function setAuMode(m){
+  auMode=m;
+  $("auTabIn").setAttribute("aria-pressed",m==="in");$("auTabUp").setAttribute("aria-pressed",m==="up");
+  $("auTabs").hidden=m==="reset";
+  $("auNameF").hidden=m!=="up";$("auPin2F").hidden=m==="in";$("auMailF").hidden=m==="reset";$("auForgot").hidden=m!=="in";
+  $("auTitle").textContent=m==="in"?"Anmelden":m==="up"?"Konto erstellen":"Neuen PIN setzen";
+  $("auLead").textContent=m==="in"?"Mit deiner E-Mail und deinem PIN. Du bleibst angemeldet, auch offline.":m==="up"?"Dein Name erscheint bei «Erfasst durch». Den PIN wählst du selbst, mindestens 6 Ziffern.":"Wähle einen neuen PIN mit mindestens 6 Ziffern.";
+  $("auGo").textContent=m==="in"?"Anmelden":m==="up"?"Konto erstellen":"PIN speichern";
+  $("auPin").autocomplete=m==="in"?"current-password":"new-password";$("auPinL").textContent=m==="reset"?"Neuer PIN":"PIN";
+  $("auErr").textContent="";
+}
+$("auTabIn").onclick=()=>setAuMode("in");$("auTabUp").onclick=()=>setAuMode("up");
+function showAuth(m){setAuMode(m||"in");if(session&&session.user)$("auMail").value=session.user.email||"";$("auth").hidden=false;setTimeout(()=>$(m==="reset"?"auPin":($("auMail").value?"auPin":"auMail")).focus(),100)}
+$("auForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const mail=$("auMail").value.trim().toLowerCase(),pin=$("auPin").value.trim(),pin2=$("auPin2").value.trim(),name=$("auName").value.trim();
+  if(auMode!=="reset"&&!/^\S+@\S+\.\S+$/.test(mail)){$("auErr").textContent="Bitte eine gültige E-Mail eingeben.";return}
+  if(pin.length<6){$("auErr").textContent="PIN: mindestens 6 Ziffern.";return}
+  if(auMode!=="in"&&pin!==pin2){$("auErr").textContent="Die beiden PINs sind nicht gleich.";return}
+  if(auMode==="up"&&!name){$("auErr").textContent="Bitte deinen Namen eingeben.";return}
+  $("auGo").disabled=true;$("auErr").textContent="Einen Moment …";
+  try{
+    if(auMode==="in"){setSession(await authCall("token?grant_type=password",{email:mail,password:pin}))}
+    else if(auMode==="up"){const d=await authCall("signup",{email:mail,password:pin,data:{name}});
+      if(!d.access_token){$("auErr").textContent="Konto erstellt. Bitte E-Mail bestätigen, dann anmelden.";setAuMode("in");return}
+      setSession(d)}
+    else{await authCall("user",{password:pin},"PUT",recoveryToken);recoveryToken=null;toast("Neuer PIN gespeichert");}
+    $("auPin").value="";$("auPin2").value="";$("auth").hidden=true;
+    if(auMode!=="reset")toast("Hallo "+(myName()||"")+" 👋");
+    afterAuth();
+  }catch(err){$("auErr").textContent=auErr(err)}
+  finally{$("auGo").disabled=false}
+});
+$("auForgot").onclick=()=>{
+  const mail=$("auMail").value.trim().toLowerCase();
+  if(!/^\S+@\S+\.\S+$/.test(mail)){$("auErr").textContent="Zuerst deine E-Mail oben eingeben.";$("auMail").focus();return}
+  ask("PIN zurücksetzen?","Wir schicken einen Link an "+mail+". Den Link auf diesem Handy öffnen, dann neuen PIN wählen.",[{label:"Abbrechen"},{label:"Link senden",cls:"dark",fn:async()=>{
+    try{await authCall("recover",{email:mail,redirect_to:location.origin+location.pathname});$("auErr").textContent="Link verschickt. Schau in dein Postfach (auch Spam).";}
+    catch(err){$("auErr").textContent=auErr(err)}}}]);
+};
+function showMe(){const b=$("meBtn");if(!session){b.hidden=true;return}b.hidden=false;b.textContent=((session.user.name||session.user.email||"?").trim()[0]||"?").toUpperCase()}
+async function signOut(silent){
+  const tok=session&&session.access_token;
+  if(tok)authCall("logout",null,"POST",tok).catch(()=>{});
+  setSession(null);if(team)logout();showMe();if(!silent)toast("Abgemeldet");showAuth("in");
+}
+$("meBtn").onclick=()=>{
+  if(!session)return showAuth("in");
+  ask(session.user.name||"Profil",session.user.email+(queue.length?" · "+queue.length+" Einträge warten noch auf Upload":""),[
+    {label:"Name ändern",fn:()=>ask("Name ändern","So erscheinst du bei «Erfasst durch» für neue Einträge.",[{label:"Abbrechen"},{label:"Speichern",cls:"dark",fn:async v=>{if(!v)return;try{const tok=await ensureToken();const u=await authCall("user",{data:{name:v}},"PUT",tok);session.user.name=v;ls.set(LS+"-session",session);ls.set(LS+"-me",v);await ensureToken();showMe();render();toast("Name gespeichert");forceRefresh()}catch(e){toast(auErr(e))}}}],session.user.name)},
+    {label:"PIN ändern",fn:()=>{recoveryToken=null;ask("PIN ändern","Neuer PIN, mindestens 6 Ziffern:",[{label:"Abbrechen"},{label:"Speichern",cls:"dark",fn:async v=>{if(!v||v.length<6){toast("Mindestens 6 Ziffern");return}try{const tok=await ensureToken();await authCall("user",{password:v},"PUT",tok);toast("PIN geändert")}catch(e){toast(auErr(e))}}}],"");$("dlgI").type="password";$("dlgI").inputMode="numeric";}},
+    {label:"Abmelden",cls:"danger",fn:()=>{if(queue.length)ask("Wirklich abmelden?",queue.length+" Einträge sind noch nicht hochgeladen.",[{label:"Zurück"},{label:"Trotzdem abmelden",cls:"danger",fn:()=>signOut()}]);else signOut()}}]);
+};
+// new name must land in the token: refresh once
+function forceRefresh(){if(session){session.expires_at=0;ensureToken().catch(()=>{})}}
+const _ask=ask;ask=function(){$("dlgI").type="text";$("dlgI").removeAttribute("inputmode");return _ask.apply(this,arguments)};
+function afterAuth(){showMe();if(team){showName();kick()}else if(!ls.get(LS+"-loginseen",0))showLogin()}
+// recovery link: #access_token=…&type=recovery
+(function(){const h=new URLSearchParams(location.hash.slice(1));if(h.get("type")==="recovery"&&h.get("access_token")){recoveryToken=h.get("access_token");history.replaceState(null,"",location.pathname);setTimeout(()=>showAuth("reset"),50)}})();
 (function boot(){
   {const l=ls.get(LS+"-loc",{})||{};$("eFloor").value=l.etage||"";$("eRoom").value=l.raum||"";$("eOffice").value=l.buero||""}
   setMode(ls.get(LS+"-mode","quick"));
@@ -3176,8 +3292,11 @@ $("typeReset").onclick=()=>ask("Standard wiederherstellen?","Deine eigenen Regel
   let a=activeList();
   if(!a||a.closed){const open=lists.filter(x=>!x.closed).sort((x,y)=>y.updated-x.updated)[0];if(open)a=open;else a=newList();activeId=a.id}
   items=(a.items||[]).slice();persist();showName();render();loadDraft();checkExt();
-  if(team){const tl=lists.find(x=>x.team===team.code);if(tl&&tl.id!==activeId&&!activeList().items.length){activeId=tl.id;items=(tl.items||[]).slice()}showName();kick()}
-  else if(!ls.get(LS+"-loginseen",0))showLogin();
+  if(team){const tl=lists.find(x=>x.team===team.code);if(tl&&tl.id!==activeId&&!activeList().items.length){activeId=tl.id;items=(tl.items||[]).slice()}showName()}
+  showMe();
+  if(recoveryToken){}
+  else if(!session)showAuth("in");
+  else afterAuth();
   if(!ls.ok()){$("notice").hidden=false;$("notice").textContent="Dieser Browser speichert nichts. Datei in Chrome öffnen, nicht in einer Vorschau."}
 })();
 </script>
