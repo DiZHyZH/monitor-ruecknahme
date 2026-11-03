@@ -3230,7 +3230,7 @@ function setAuMode(m){
   $("auTabs").hidden=m==="reset";
   $("auNameF").hidden=m!=="up";$("auPin2F").hidden=m==="in";$("auMailF").hidden=m==="reset";$("auForgot").hidden=m!=="in";
   $("auTitle").textContent=m==="in"?"Anmelden":m==="up"?"Konto erstellen":"Neuen PIN setzen";
-  $("auLead").textContent=m==="in"?"Mit deiner E-Mail und deinem PIN. Du bleibst angemeldet, auch offline.":m==="up"?"Dein Name erscheint bei «Erfasst durch». Den PIN wählst du selbst, mindestens 6 Ziffern.":"Wähle einen neuen PIN mit mindestens 6 Ziffern.";
+  $("auLead").textContent=m==="in"?"Mit deiner E-Mail und deinem PIN. Du bleibst angemeldet, auch offline.":m==="up"?"Dein Name erscheint bei «Erfasst durch» und kann danach nicht mehr geändert werden. Den PIN wählst du selbst, mindestens 6 Ziffern.":"Wähle einen neuen PIN mit mindestens 6 Ziffern.";
   $("auGo").textContent=m==="in"?"Anmelden":m==="up"?"Konto erstellen":"PIN speichern";
   $("auPin").autocomplete=m==="in"?"current-password":"new-password";$("auPinL").textContent=m==="reset"?"Neuer PIN":"PIN";
   $("auErr").textContent="";
@@ -3272,15 +3272,15 @@ async function signOut(silent){
 }
 $("meBtn").onclick=()=>{
   if(!session)return showAuth("in");
-  ask(session.user.name||"Profil",session.user.email+(queue.length?" · "+queue.length+" Einträge warten noch auf Upload":""),[
-    {label:"Name ändern",fn:()=>ask("Name ändern","So erscheinst du bei «Erfasst durch» für neue Einträge.",[{label:"Abbrechen"},{label:"Speichern",cls:"dark",fn:async v=>{if(!v)return;try{const tok=await ensureToken();const u=await authCall("user",{data:{name:v}},"PUT",tok);session.user.name=v;ls.set(LS+"-session",session);ls.set(LS+"-me",v);await ensureToken();showMe();render();toast("Name gespeichert");forceRefresh()}catch(e){toast(auErr(e))}}}],session.user.name)},
+  ask(session.user.name||"Profil",session.user.email+" · Der Name ist fest mit dem Konto verbunden. Tippfehler? Beim Admin melden."+(queue.length?" · "+queue.length+" Einträge warten noch auf Upload":""),[
     {label:"PIN ändern",fn:()=>{recoveryToken=null;ask("PIN ändern","Neuer PIN, mindestens 6 Ziffern:",[{label:"Abbrechen"},{label:"Speichern",cls:"dark",fn:async v=>{if(!v||v.length<6){toast("Mindestens 6 Ziffern");return}try{const tok=await ensureToken();await authCall("user",{password:v},"PUT",tok);toast("PIN geändert")}catch(e){toast(auErr(e))}}}],"");$("dlgI").type="password";$("dlgI").inputMode="numeric";}},
     {label:"Abmelden",cls:"danger",fn:()=>{if(queue.length)ask("Wirklich abmelden?",queue.length+" Einträge sind noch nicht hochgeladen.",[{label:"Zurück"},{label:"Trotzdem abmelden",cls:"danger",fn:()=>signOut()}]);else signOut()}}]);
 };
 // new name must land in the token: refresh once
 function forceRefresh(){if(session){session.expires_at=0;ensureToken().catch(()=>{})}}
 const _ask=ask;ask=function(){$("dlgI").type="text";$("dlgI").removeAttribute("inputmode");return _ask.apply(this,arguments)};
-function afterAuth(){showMe();if(team){showName();kick()}else if(!ls.get(LS+"-loginseen",0))showLogin()}
+async function loadProfile(){try{const p=await rpc("mr_profile",{});if(p&&p.name&&session){session.user.name=p.name;ls.set(LS+"-session",session);ls.set(LS+"-me",p.name);showMe();render()}}catch(e){}}
+function afterAuth(){showMe();loadProfile();if(team){showName();kick()}else if(!ls.get(LS+"-loginseen",0))showLogin()}
 // recovery link: #access_token=…&type=recovery
 (function(){const h=new URLSearchParams(location.hash.slice(1));if(h.get("type")==="recovery"&&h.get("access_token")){recoveryToken=h.get("access_token");history.replaceState(null,"",location.pathname);setTimeout(()=>showAuth("reset"),50)}})();
 (function boot(){

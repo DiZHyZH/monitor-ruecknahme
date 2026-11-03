@@ -1,16 +1,52 @@
 -- Korrektur 2: Benutzerkonten (E-Mail + PIN)
 -- Ab jetzt dürfen nur angemeldete Nutzer die Rollout-Funktionen aufrufen.
--- «Erfasst durch» kommt serverseitig aus dem Profil und kann nicht gefälscht werden.
+-- «Erfasst durch» kommt serverseitig aus der gesperrten Tabelle profiles und kann nicht gefälscht werden.
+-- Darf mehrfach ausgeführt werden.
 -- Einmal im SQL Editor ausführen. Bestehende Daten bleiben erhalten.
 
 alter table public.scans    add column if not exists user_id uuid;
 alter table public.rollouts add column if not exists created_by_uid uuid;
 
--- Name des angemeldeten Nutzers (aus dem Profil, sonst E-Mail)
+-- Profile: Name wird beim Registrieren einmal festgelegt und ist danach gesperrt.
+-- Nur der Admin kann ihn ändern (Supabase → Table Editor → profiles).
+create table if not exists public.profiles (
+  id         uuid primary key references auth.users(id) on delete cascade,
+  name       text not null,
+  email      text,
+  created_at timestamptz not null default now()
+);
+alter table public.profiles enable row level security;
+revoke all on public.profiles from anon, authenticated;
+
+create or replace function public.mr_new_user() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.profiles(id, name, email)
+  values (new.id, coalesce(nullif(trim(new.raw_user_meta_data ->> 'name'), ''), new.email), new.email)
+  on conflict (id) do nothing;
+  return new;
+end $$;
+drop trigger if exists mr_on_signup on auth.users;
+create trigger mr_on_signup after insert on auth.users for each row execute function public.mr_new_user();
+
+-- bestehende Konten nachtragen
+insert into public.profiles(id, name, email)
+select id, coalesce(nullif(trim(raw_user_meta_data ->> 'name'), ''), email), email from auth.users
+on conflict (id) do nothing;
+
+-- Name des angemeldeten Nutzers: immer aus profiles, nie aus dem änderbaren Token
 create or replace function public.mr_me() returns text
 language sql stable security definer set search_path = public, extensions as $$
-  select coalesce(nullif(auth.jwt() -> 'user_metadata' ->> 'name', ''), auth.jwt() ->> 'email');
+  select coalesce((select name from public.profiles where id = auth.uid()), auth.jwt() ->> 'email');
 $$;
+
+-- Für die App: eigenes Profil lesen (nur lesen)
+create or replace function public.mr_profile() returns jsonb
+language plpgsql stable security definer set search_path = public, extensions as $$
+begin
+  perform mr_auth();
+  return (select jsonb_build_object('name', name, 'email', email) from public.profiles where id = auth.uid());
+end $$;
 
 create or replace function public.mr_auth() returns void
 language plpgsql security definer set search_path = public, extensions as $$
@@ -83,6 +119,9 @@ revoke all on function public.mr_join(text,text,text)                from public
 revoke all on function public.mr_add(text,text,jsonb)                from public, anon;
 revoke all on function public.mr_list(text,text,timestamptz)         from public, anon;
 revoke all on function public.mr_delete(text,text,text)              from public, anon;
+revoke all on function public.mr_new_user()                         from public, anon, authenticated;
+revoke all on function public.mr_profile()                          from public, anon;
+grant execute on function public.mr_profile()                        to authenticated;
 grant execute on function public.mr_join(text,text,text)             to authenticated;
 grant execute on function public.mr_add(text,text,jsonb)             to authenticated;
 grant execute on function public.mr_list(text,text,timestamptz)      to authenticated;
