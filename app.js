@@ -140,22 +140,30 @@ function enqueue(op) { queue.push(op); ls.set("queue", queue); badge(); kick(); 
 const pendingFor = id => queue.filter(q => q.job === id).length;
 
 /* ---------- Ist/Soll ---------- */
-function counts(jobId, siteId) {
-  const c = {}; scansOf(jobId, siteId).forEach(s => { const t = devType(s.asset) || "Unbekannt"; c[t] = (c[t] || 0) + 1; }); return c;
+const DIRS = [["ab", "Abbau"], ["auf", "Aufbau"]];
+const dirOf = s => s.dir || "ab";
+function counts(jobId, siteId, dir) {
+  const c = {}; scansOf(jobId, siteId).filter(s => !dir || dirOf(s) === dir).forEach(s => { const t = devType(s.asset) || "Unbekannt"; c[t] = (c[t] || 0) + 1; }); return c;
 }
-function sollOf(job, siteId) {
-  const c = {}; (job.sites || []).filter(s => !siteId || s.id === siteId).forEach(s => Object.entries(s.soll || {}).forEach(([k, v]) => { const n = parseInt(v) || 0; if (n) c[k] = (c[k] || 0) + n; })); return c;
+// Soll-Format: {ab:{Typ:n}, auf:{Typ:n}}; altes flaches Format zählt als Abbau
+function sollSite(s, dir) { const so = s.soll || {}; const nested = so.ab || so.auf; const src = nested ? (so[dir] || {}) : (dir === "ab" ? so : {}); const c = {}; Object.entries(src).forEach(([k, v]) => { const n = parseInt(v) || 0; if (n) c[k] = n; }); return c; }
+function sollOf(job, siteId, dir) {
+  const c = {}; (job.sites || []).filter(s => !siteId || s.id === siteId).forEach(s => (dir ? [dir] : ["ab", "auf"]).forEach(d => Object.entries(sollSite(s, d)).forEach(([k, n]) => c[k] = (c[k] || 0) + n))); return c;
 }
 function progressEl(job, siteId) {
-  const ist = counts(job.id, siteId), soll = sollOf(job, siteId);
-  const keys = [...new Set([...TYPE_NAMES.filter(t => soll[t] || ist[t]), ...Object.keys(ist)])];
-  if (!keys.length) return h("div", { class: "empty" }, "Kein Soll erfasst.");
-  return h("div", { class: "prog" }, keys.map(k => {
-    const s = soll[k] || 0, i = ist[k] || 0, pct = s ? Math.min(100, i / s * 100) : 100;
-    return h("div", { class: "prow" + (i > s ? " over" : i === s && s ? " full" : "") },
-      h("span", { class: "pn" }, k), h("div", { class: "bar" + (i >= s && s ? " done" : "") }, h("i", { style: "width:" + pct + "%" })),
-      h("b", null, i + " / " + (s || "–")));
-  }));
+  const out = h("div", { class: "prog" });
+  DIRS.forEach(([d, label]) => {
+    const ist = counts(job.id, siteId, d), soll = sollOf(job, siteId, d);
+    const keys = [...new Set([...TYPE_NAMES.filter(t => soll[t] || ist[t]), ...Object.keys(ist)])];
+    if (!keys.length) return;
+    out.append(h("div", { class: "progdir " + d }, label));
+    keys.forEach(k => {
+      const s = soll[k] || 0, i = ist[k] || 0, pct = s ? Math.min(100, i / s * 100) : 100;
+      out.append(h("div", { class: "prow" + (i > s ? " over" : i === s && s ? " full" : "") },
+        h("span", { class: "pn" }, k), h("div", { class: "bar" + (i >= s && s ? " done" : "") }, h("i", { style: "width:" + pct + "%" })), h("b", null, i + " / " + (s || "–"))));
+    });
+  });
+  return out.children.length ? out : h("div", { class: "empty" }, "Kein Soll erfasst.");
 }
 function totalProgress(job) {
   const s = Object.values(sollOf(job)).reduce((a, b) => a + b, 0);
@@ -213,7 +221,7 @@ async function pullJob(id) {
     if (r.updated_at > d.sinceS) d.sinceS = r.updated_at;
     if (r.deleted) { if (d.scans[r.id]) { delete d.scans[r.id]; ch = true; } return; }
     const o = { id: r.id, asset: r.asset, site_id: r.site_id, ts: Number(r.ts) || Date.parse(r.updated_at), by: r.by, user_id: r.user_id };
-    ["neu", "etage", "raum", "buero", "place", "cond", "note"].forEach(k => { if (r[k]) o[k] = r[k]; });
+    ["neu", "etage", "raum", "buero", "place", "cond", "note", "dir", "art", "grp"].forEach(k => { if (r[k]) o[k] = r[k]; });
     d.scans[r.id] = o; ch = true;
   });
   const mrows = await rpc("mat_list", { p_job: id, p_since: d.sinceM }) || [];
@@ -417,6 +425,7 @@ function renderJob() {
   const row = (k, v) => kv.append(h("dt", null, k), h("dd", null, v));
   row("Datum", fmtDate(j.datum)); row("Zeit", j.zeit_von + " – " + j.zeit_bis); row("Art", j.art === "tour" ? "Tour · " + j.sites.length + " Standorte" : "Rollout");
   if (j.wo) row("WO / INC", j.wo);
+  row("Austausch", (j.tausch || "1:1").replace(":", " : ") + (j.tausch === "frei" ? "" : " (alt : neu)"));
   row("Lead", j.lead_name || "–"); row("Team", j.members && j.members.length ? j.members.join(", ") : "noch niemand eingeladen");
   const b = $("jBtns"); b.innerHTML = "";
   const closed = j.status === "abgeschlossen";
@@ -441,7 +450,7 @@ function renderJob() {
         h("span", null, "👤 " + s.kontakt), h("a", { href: "tel:" + s.telefon.replace(/[^\d+]/g, "") }, "📞 " + s.telefon),
         h("button", { class: "btn link", type: "button", style: "min-height:0;padding:0", onclick: () => { navigator.clipboard && navigator.clipboard.writeText(s.telefon).then(() => toast("Nummer kopiert")).catch(() => {}); } }, "kopieren")),
       s.zutritt ? h("div", { class: "zut" }, "🔑 " + s.zutritt) : null,
-      h("div", { class: "hint", style: "margin:0" }, "Soll: " + (Object.entries(s.soll || {}).filter(([, v]) => +v).map(([k, v]) => v + " " + k).join(", ") || "–"))));
+      h("div", { class: "hint", style: "margin:0" }, "Soll: " + (DIRS.map(([d, l]) => { const x = Object.entries(sollSite(s, d)).map(([k, v]) => v + " " + k).join(", "); return x ? l + " " + x : ""; }).filter(Boolean).join(" · ") || "–"))));
   });
   const mat = (j.material || []).filter(m => +m.qty > 0);
   $("jMatCard").hidden = !mat.length;
@@ -461,7 +470,8 @@ async function finishJob(j) {
   }
   try { await pullJob(j.id); } catch (e) {}
   const miss = [];
-  j.sites.forEach((s, i) => { const ist = counts(j.id, s.id), soll = sollOf(j, s.id); Object.entries(soll).forEach(([k, v]) => { const d = v - (ist[k] || 0); if (d > 0) miss.push((j.sites.length > 1 ? "Standort " + (i + 1) + ": " : "") + d + " × " + k); }); });
+  j.sites.forEach((s, i) => DIRS.forEach(([dd, l]) => { const ist = counts(j.id, s.id, dd), soll = sollOf(j, s.id, dd); Object.entries(soll).forEach(([k, v]) => { const d = v - (ist[k] || 0); if (d > 0) miss.push((j.sites.length > 1 ? "Standort " + (i + 1) + ": " : "") + l + " " + d + " × " + k); }); }));
+  swapsOf(j.id).filter(g => !g.neu.length || !g.alt.length).forEach(g => miss.push("Austausch " + g.no + " ist unvollständig (" + (g.alt.length ? "kein neues" : "kein altes") + " Gerät)"));
   const body = h("div", null, miss.length ? [h("div", null, "Laut Soll fehlen noch:"), h("ul", null, miss.map(m => h("li", null, m))), h("div", { style: "margin-top:8px" }, "Trotzdem abschliessen? Danach kann niemand mehr etwas erfassen.")]
     : "Alles erfasst, was geplant war ✅ Nach dem Abschliessen kann niemand mehr etwas erfassen.");
   ask(miss.length ? "Wirklich alles erfasst?" : "Auftrag abschliessen?", body, [{ label: "Zurück" }, { label: miss.length ? "Trotzdem abschliessen" : "Abschliessen", cls: "dark", fn: async () => { await setStatus(j, "abgeschlossen"); ask("Abgeschlossen", "Excel jetzt herunterladen?", [{ label: "Später" }, { label: "Excel", cls: "primary", fn: () => exportJob(j) }]); } }]);
@@ -469,6 +479,56 @@ async function finishJob(j) {
 
 /* ---------- Erfassen ---------- */
 let listAll = false, cond = "ok", freshId = null, armed = null;
+let mode = "tausch";              // tausch | auf | ab
+let swap = null;                  // {grp, step:'alt'|'neu'|'done'}
+const RATIO = r => r === "frei" ? null : { alt: +r.split(":")[0], neu: +r.split(":")[1] };
+const ratioOf = j => ls.get("ratio:" + j.id, null) || j.tausch || "1:1";
+function swapsOf(jobId) {
+  const g = {}; scansOf(jobId).filter(s => s.art === "tausch" && s.grp).forEach(s => { (g[s.grp] = g[s.grp] || { grp: s.grp, ts: s.ts, alt: [], neu: [], site_id: s.site_id }); (dirOf(s) === "ab" ? g[s.grp].alt : g[s.grp].neu).push(s); g[s.grp].ts = Math.min(g[s.grp].ts, s.ts); });
+  return Object.values(g).sort((a, b) => a.ts - b.ts).map((x, i) => ({ ...x, no: i + 1 }));
+}
+function curSwap(j) { return swap && swapsOf(j.id).find(g => g.grp === swap.grp); }
+function saveSwap() { ls.set("swap:" + cur, swap); }
+function setMode(m) {
+  mode = m; ls.set("mode:" + cur, m);
+  document.querySelectorAll("#dirSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === m));
+  $("scanCard").className = "card scancard dir-" + m;
+  renderSwap();
+  $("scanIn").placeholder = m === "auf" ? "Neues Gerät scannen (Aufbau)" : m === "ab" ? "Altes Gerät scannen (Abbau)" : (swap && swap.step === "neu" ? "NEUES Gerät scannen" : "ALTES Gerät scannen");
+}
+document.querySelectorAll("#dirSeg button").forEach(b => b.onclick = () => { setMode(b.dataset.v); setMsg(b.dataset.v === "tausch" ? "Austausch: zuerst das alte Gerät scannen." : b.dataset.v === "auf" ? "Nur Aufbau: neue Geräte scannen." : "Nur Abbau: alte Geräte scannen.", ""); refocus(); });
+document.querySelectorAll("#ratioSel button").forEach(b => b.onclick = () => { const j = jobById(cur); ls.set("ratio:" + cur, b.dataset.v); renderSwap(); toast("Verhältnis " + b.textContent + " gespeichert"); refocus(); });
+function nextStep(j) {
+  // bestimmt den nächsten Schritt im aktuellen Austausch anhand des Verhältnisses
+  const g = curSwap(j); const r = RATIO(ratioOf(j));
+  if (!g) return "alt";
+  if (swap.force) return swap.force;
+  if (!g.neu.length) return (r && g.alt.length < r.alt) ? "alt" : "neu";
+  if (r && g.neu.length < r.neu) return "neu";
+  return r ? "done" : "neu-or-done";
+}
+function renderSwap() {
+  const j = jobById(cur); const box = $("swapBox"); if (!j) return;
+  box.hidden = mode !== "tausch";
+  const rv = ratioOf(j); document.querySelectorAll("#ratioSel button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === rv));
+  if (mode !== "tausch") return;
+  const g = curSwap(j); const st = nextStep(j); const n = g ? g.no : swapsOf(j.id).length + 1;
+  const step = $("swapStep");
+  if (!g) { step.className = "swapstep alt"; step.textContent = "Austausch " + n + " · ① ALTES Gerät scannen"; }
+  else if (st === "alt") { step.className = "swapstep alt"; step.textContent = "Austausch " + n + " · ① weiteres ALTES Gerät scannen (" + g.alt.length + "/" + RATIO(rv).alt + ")"; }
+  else if (st === "neu" || st === "neu-or-done") { step.className = "swapstep neu"; step.textContent = "Austausch " + n + " · ② NEUES Gerät scannen" + (g.neu.length && RATIO(rv) ? " (" + g.neu.length + "/" + RATIO(rv).neu + ")" : ""); }
+  else { step.className = "swapstep done"; step.textContent = "✓ Austausch " + n + " fertig · nächstes altes Gerät scannen"; }
+  const ids = (arr, empty) => arr.length ? arr.map(x => h("div", null, x.asset)) : [h("em", null, empty)];
+  $("swapAlt").innerHTML = ""; $("swapAlt").append(...ids(g ? g.alt : [], "–"));
+  $("swapNeu").innerHTML = ""; $("swapNeu").append(...ids(g ? g.neu : [], "–"));
+  $("swapMoreAlt").hidden = !g || st === "alt"; $("swapMoreNeu").hidden = !g || !g.neu.length || st === "neu";
+  $("swapNew").hidden = !g || st === "alt" && !g.alt.length;
+  if (mode === "tausch") $("scanIn").placeholder = (!g || st === "alt" || st === "done") ? "ALTES Gerät scannen" : "NEUES Gerät scannen";
+}
+$("swapMoreAlt").onclick = () => { if (!swap) return; swap.force = "alt"; saveSwap(); renderSwap(); setMsg("Weiteres altes Gerät scannen.", ""); refocus(); };
+$("swapMoreNeu").onclick = () => { if (!swap) return; swap.force = "neu"; saveSwap(); renderSwap(); setMsg("Weiteres neues Gerät scannen.", ""); refocus(); };
+$("swapNew").onclick = () => { swap = null; saveSwap(); renderSwap(); setMsg("Neuer Austausch: altes Gerät scannen.", ""); refocus(); };
+
 function renderScan(first) {
   const j = jobById(cur); if (!j) return;
   $("topTitle").textContent = j.kunde; $("topSub").textContent = j.code;
@@ -477,22 +537,27 @@ function renderScan(first) {
     sel.innerHTML = ""; j.sites.forEach((s, i) => sel.append(h("option", { value: s.id }, (j.sites.length > 1 ? (i + 1) + ". " : "") + siteLabel(s))));
     const last = ls.get("site:" + j.id, null); siteId = j.sites.some(s => s.id === last) ? last : (j.sites[0] && j.sites[0].id); sel.value = siteId;
     const dt = ls.get("det:" + j.id, {}); $("dEtage").value = dt.etage || ""; $("dRaum").value = dt.raum || ""; $("dBuero").value = dt.buero || "";
+    swap = ls.get("swap:" + j.id, null);
+    const sa = sollOf(j, null, "auf"), sb = sollOf(j, null, "ab");
+    const def = ls.get("mode:" + j.id, null) || (Object.keys(sa).length && Object.keys(sb).length ? "tausch" : Object.keys(sa).length ? "auf" : "ab");
+    setMode(def);
   }
   $("siteSelF").hidden = j.sites.length < 2;
   const s = j.sites.find(x => x.id === siteId) || j.sites[0];
   const sa = $("siteAddr"); sa.innerHTML = "";
-  if (s) sa.append(h("b", null, siteLabel(s)), h("br"), "👤 " + s.kontakt + " · 📞 " + s.telefon, s.zutritt ? h("span", null, " · 🔑 " + s.zutritt) : null);
+  if (s) sa.append(...[h("b", null, siteLabel(s)), h("br"), "👤 " + s.kontakt + " · 📞 " + s.telefon, s.zutritt ? " · 🔑 " + s.zutritt : ""].filter(Boolean));
   const closed = j.status === "abgeschlossen";
   $("scanIn").disabled = closed; $("scanForm").querySelector("button").disabled = closed;
   ["camIn", "galIn"].forEach(id => { $(id).disabled = closed; });
+  document.querySelectorAll("#dirSeg button").forEach(b => b.disabled = closed);
   if (closed) setMsg("Auftrag ist abgeschlossen. Erfassen nicht mehr möglich.", "bad");
   $("progSite").textContent = j.sites.length > 1 ? "· Standort " + (j.sites.indexOf(s) + 1) : "";
   $("sProgress").innerHTML = ""; $("sProgress").append(progressEl(j, listAll ? null : siteId));
-  renderMat(j); renderRows(j);
+  renderSwap(); renderMat(j); renderRows(j);
   $("detSum").textContent = [$("dEtage").value, $("dRaum").value && "Raum " + $("dRaum").value, $("dBuero").value].filter(Boolean).join(" · ");
   if (first && matchMedia("(pointer:fine)").matches && !closed) setTimeout(() => $("scanIn").focus(), 50);
 }
-$("siteSel").addEventListener("change", e => { siteId = e.target.value; ls.set("site:" + cur, siteId); renderScan(false); setMsg("Standort gewechselt. Bereit.", ""); refocus(); });
+$("siteSel").addEventListener("change", e => { siteId = e.target.value; ls.set("site:" + cur, siteId); swap = null; saveSwap(); renderScan(false); setMsg("Standort gewechselt. Bereit.", ""); refocus(); });
 $("lsSite").onclick = () => { listAll = false; $("lsSite").setAttribute("aria-pressed", true); $("lsAll").setAttribute("aria-pressed", false); renderScan(false); };
 $("lsAll").onclick = () => { listAll = true; $("lsSite").setAttribute("aria-pressed", false); $("lsAll").setAttribute("aria-pressed", true); renderScan(false); };
 function setMsg(t, cls) { const m = $("scanMsg"); m.className = "msg " + (cls || ""); m.textContent = t; void m.offsetWidth; if (cls) m.classList.add("flash"); }
@@ -502,48 +567,76 @@ function renderRows(j) {
   $("listCount").textContent = rows.length ? "· " + rows.length : "";
   $("scanEmpty").hidden = rows.length > 0; $("scanEmpty").textContent = listAll ? "Noch nichts erfasst." : "Noch nichts erfasst an diesem Standort.";
   const total = rows.length; const siteNo = id => j.sites.findIndex(s => s.id === id) + 1;
+  const swapNo = {}; swapsOf(j.id).forEach(g => swapNo[g.grp] = g.no);
   rows.forEach((s, i) => {
-    const ty = devType(s.asset);
+    const ty = devType(s.asset), d = dirOf(s);
     const canDel = j.status !== "abgeschlossen" && (s.user_id === me.id || isLead(j));
     const del = canDel ? h("button", { class: "x" + (armed === s.id ? " arm" : ""), type: "button", onclick: () => {
       if (armed !== s.id) { armed = s.id; renderRows(j); setTimeout(() => { if (armed === s.id) { armed = null; renderRows(j); } }, 3000); return; }
       armed = null; removeScan(j, s);
     } }, armed === s.id ? "Sicher?" : "Löschen") : "";
-    const extra = [s.neu && "→ " + s.neu, s.cond && s.cond !== "ok" ? (s.cond === "defekt" ? "Defekt" : "Spuren") : "", s.note].filter(Boolean).join(" · ");
+    const extra = [s.cond && s.cond !== "ok" ? (s.cond === "defekt" ? "Defekt" : "Spuren") : "", s.note].filter(Boolean).join(" · ");
     const ort = [listAll && j.sites.length > 1 ? "S" + siteNo(s.site_id) : "", s.etage, s.raum && "R " + s.raum, s.place && "P " + s.place].filter(Boolean).join(" · ");
+    const artTag = s.art === "tausch" ? "Tausch " + (swapNo[s.grp] || "") + (d === "ab" ? " ↓" : " ↑") : (d === "ab" ? "Abbau" : "Aufbau");
     tb.append(h("tr", { class: (s.id === freshId ? "fresh " : "") + (s.pending ? "pending" : "") },
       h("td", { class: "n" }, String(total - i)), h("td", { class: "a" }, s.asset, extra ? h("small", null, extra) : null),
-      h("td", null, h("span", { class: "tag" + (ty ? "" : " unk") }, ty || "Unbekannt")), h("td", { class: "o hide-s" }, ort), h("td", { class: "b hide-s" }, (s.by || "").split(" ")[0]), h("td", null, del)));
+      h("td", null, h("span", { class: "tag" + (ty ? "" : " unk") }, ty || "Unbekannt")), h("td", null, h("span", { class: "tag " + d }, artTag)),
+      h("td", { class: "o hide-s" }, ort), h("td", { class: "b hide-s" }, (s.by || "").split(" ")[0]), h("td", null, del)));
   });
 }
 function removeScan(j, s) {
   const d = jd(j.id);
   const qi = queue.findIndex(q => q.op === "scan" && q.item.id === s.id);
   if (qi >= 0) { queue.splice(qi, 1); ls.set("queue", queue); } else enqueue({ op: "scandel", job: j.id, id: s.id });
-  delete d.scans[s.id]; saveJd(j.id); renderScan(false); toast("Gelöscht: " + s.asset);
+  delete d.scans[s.id]; saveJd(j.id);
+  if (swap && s.grp === swap.grp && !swapsOf(j.id).some(g => g.grp === swap.grp)) { swap = null; saveSwap(); }
+  renderScan(false); toast("Gelöscht: " + s.asset);
 }
-function details() { return { etage: $("dEtage").value.trim(), raum: $("dRaum").value.trim(), buero: $("dBuero").value.trim(), place: $("dPlatz").value.trim(), neu: clean($("dNeu").value), cond, note: $("dNote").value.trim() }; }
+function details() { return { etage: $("dEtage").value.trim(), raum: $("dRaum").value.trim(), buero: $("dBuero").value.trim(), place: $("dPlatz").value.trim(), cond, note: $("dNote").value.trim() }; }
 ["dEtage", "dRaum", "dBuero"].forEach(id => $(id).addEventListener("input", () => { ls.set("det:" + cur, { etage: $("dEtage").value, raum: $("dRaum").value, buero: $("dBuero").value }); $("detSum").textContent = [$("dEtage").value, $("dRaum").value && "Raum " + $("dRaum").value, $("dBuero").value].filter(Boolean).join(" · "); }));
 document.querySelectorAll("#dCond button").forEach(b => b.onclick = () => { cond = b.dataset.v; document.querySelectorAll("#dCond button").forEach(x => x.setAttribute("aria-pressed", x === b)); });
+function clearTransient() { $("dPlatz").value = ""; $("dNote").value = ""; cond = "ok"; document.querySelectorAll("#dCond button").forEach(x => x.setAttribute("aria-pressed", x.dataset.v === "ok")); }
 function addAsset(raw) {
   const j = jobById(cur); if (!j || j.status === "abgeschlossen") return false;
   const a = clean(raw); if (!a) return false;
   if (!siteId) { setMsg("Zuerst Standort wählen.", "bad"); beepBad(); return false; }
   if (a.length < 4) { setMsg("«" + a + "» ist zu kurz für eine Asset-ID.", "bad"); beepBad(); return false; }
-  const dup = Object.values(jd(j.id).scans).find(x => norm(x.asset) === norm(a));
-  if (dup) { setMsg("Schon erfasst: " + a + " (" + (dup.by || "?").split(" ")[0] + ", " + fmtTs(dup.ts) + ")", "warn"); beepWarn(); return false; }
+  // Richtung bestimmen
+  let dir = mode === "auf" ? "auf" : "ab", grp = null, art = "einzeln", step = null;
+  if (mode === "tausch") {
+    art = "tausch"; step = nextStep(j);
+    const g = curSwap(j);
+    if (!g || step === "done") { swap = { grp: uid(), step: "alt" }; step = "alt"; }
+    else if (step === "neu-or-done") step = "neu";
+    dir = step === "alt" ? "ab" : "auf"; grp = swap.grp;
+    const cg = curSwap(j);
+    if (dir === "auf" && cg && cg.alt.some(x => norm(x.asset) === norm(a))) { setMsg("Das ist das ALTE Gerät dieses Austauschs. Jetzt das NEUE scannen.", "bad"); beepBad(); return false; }
+  }
+  const all = Object.values(jd(j.id).scans);
+  const dup = all.find(x => norm(x.asset) === norm(a) && dirOf(x) === dir);
+  if (dup) { setMsg("Schon " + (dir === "ab" ? "abgebaut" : "aufgebaut") + ": " + a + " (" + (dup.by || "?").split(" ")[0] + ", " + fmtTs(dup.ts) + ")", "warn"); beepWarn(); return false; }
   const ty = devType(a), dt = details();
-  const rec = { id: uid(), asset: a, site_id: siteId, ...Object.fromEntries(Object.entries(dt).filter(([, v]) => v)), by: me.name, user_id: me.id, ts: Date.now(), pending: true };
+  const rec = { id: uid(), asset: a, site_id: siteId, dir, art, ...Object.fromEntries(Object.entries(dt).filter(([, v]) => v)), by: me.name, user_id: me.id, ts: Date.now(), pending: true };
+  if (grp) rec.grp = grp;
   if (rec.cond === "ok") delete rec.cond;
   jd(j.id).scans[rec.id] = rec; saveJd(j.id); enqueue({ op: "scan", job: j.id, item: rec });
   freshId = rec.id;
-  $("dPlatz").value = ""; $("dNeu").value = ""; $("dNote").value = ""; cond = "ok"; document.querySelectorAll("#dCond button").forEach(x => x.setAttribute("aria-pressed", x.dataset.v === "ok"));
-  const ist = counts(j.id, siteId)[ty] || 0, soll = sollOf(j, siteId)[ty] || 0;
-  if (!ty) { setMsg("Erfasst: " + a + " · Unbekannter Gerätetyp. Richtiger Barcode?", "warn"); beepWarn(); }
-  else if (ist > soll) { setMsg("Erfasst: " + a + " · " + ty + " · mehr als geplant (" + ist + " / " + soll + ")", "warn"); beepWarn(); }
-  else { setMsg("✓ " + a + " · " + ty + " · " + ist + " / " + soll, "ok"); beepOk(); }
+  if (swap) { delete swap.force; saveSwap(); }
+  const ist = counts(j.id, siteId, dir)[ty] || 0, soll = sollOf(j, siteId, dir)[ty] || 0;
+  const lbl = dir === "ab" ? "Abbau" : "Aufbau";
+  let warn = !ty ? "Unbekannter Gerätetyp. Richtiger Barcode?" : ist > soll ? "mehr als geplant (" + ist + " / " + soll + ")" : "";
+  if (mode === "tausch") {
+    const after = nextStep(j);
+    if (after === "done" || (after === "neu-or-done" && dir === "auf")) clearTransient();
+    const what = dir === "ab" ? "Alt" : "Neu";
+    setMsg((warn ? "" : "✓ ") + what + ": " + a + (ty ? " · " + ty : "") + (warn ? " · " + warn : "") + (after === "alt" ? " → weiteres ALTES scannen" : after === "neu" ? " → jetzt NEUES scannen" : " → Austausch fertig"), warn ? "warn" : "ok");
+  } else {
+    clearTransient();
+    setMsg((warn ? "" : "✓ ") + lbl + ": " + a + (ty ? " · " + ty : "") + (warn ? " · " + warn : " · " + ist + " / " + soll), warn ? "warn" : "ok");
+  }
+  warn ? beepWarn() : beepOk();
   renderScan(false);
-  toast("Erfasst: " + a, "Rückgängig", () => removeScan(j, rec));
+  toast(lbl + ": " + a, "Rückgängig", () => removeScan(j, rec));
   return true;
 }
 $("scanForm").addEventListener("submit", e => { e.preventDefault(); if (addAsset($("scanIn").value)) $("scanIn").value = ""; else $("scanIn").select(); refocus(); });
@@ -566,8 +659,6 @@ document.addEventListener("keydown", e => {
   const a = document.activeElement; if (a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return;
   $("scanIn").focus();
 });
-$("dNeu").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); refocus(); setMsg("Ersetzt durch: " + clean($("dNeu").value) + ". Jetzt das alte Gerät scannen.", ""); } });
-
 /* Kamera & Galerie */
 function loadImg(file) { return new Promise((res, rej) => { const u = URL.createObjectURL(file); const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("Bild nicht lesbar")); im.src = u; }); }
 function toCanvas(img, max, rot) {
@@ -656,7 +747,7 @@ async function openForm(id) {
   $("fTitle").textContent = j ? "Auftrag bearbeiten" : "Neuer Auftrag"; $("fErr").innerHTML = ""; $("fGo").textContent = j ? "Änderungen speichern" : "Auftrag freigeben";
   setArt(j ? j.art : "rollout");
   $("fKunde").value = j ? j.kunde : ""; $("fWo").value = j ? (j.wo || "") : "";
-  $("fDatum").value = j ? j.datum : ""; $("fDatum").min = j ? "" : today();
+  $("fDatum").value = j ? j.datum : ""; $("fDatum").min = j ? "" : today(); $("fTausch").value = j ? (j.tausch || "1:1") : "1:1";
   $("fVon").value = j ? j.zeit_von : ""; $("fBis").value = j ? j.zeit_bis : ""; $("fNotes").value = j ? (j.notes || "") : "";
   fSites = j ? j.sites.map(s => ({ ...s, soll: { ...s.soll } })) : [blankSite()];
   renderSites(); renderFormMat(j); updCode();
@@ -677,15 +768,18 @@ function renderSites() {
   fSites.forEach((s, i) => {
     const inp = (k, label, req, ph, attrs) => h("div", { class: "fld" }, h("label", { for: "s" + i + k }, label, req ? h("span", { class: "req" }, " ✱") : null),
       h("input", { id: "s" + i + k, type: "text", value: s[k] || "", placeholder: ph || "", "data-site": i, "data-k": k, oninput: e => { s[k] = e.target.value; e.target.classList.remove("invalid"); updCode(); }, ...(attrs || {}) }));
-    const soll = h("div", { class: "sollgrid" }, TYPE_NAMES.map(t => h("div", { class: "fld" }, h("label", { for: "s" + i + "soll" + t }, t),
-      h("input", { id: "s" + i + "soll" + t, type: "number", min: "0", step: "1", inputmode: "numeric", value: s.soll[t] || "", placeholder: "0", "data-soll": i, oninput: e => { const n = parseInt(e.target.value) || 0; if (n) s.soll[t] = n; else delete s.soll[t]; document.querySelectorAll('[data-soll="' + i + '"]').forEach(x => x.classList.remove("invalid")); } }))));
+    if (!s.soll.ab && !s.soll.auf) s.soll = Object.keys(s.soll || {}).length ? { ab: { ...s.soll }, auf: {} } : { ab: {}, auf: {} };
+    const cell = (d, t) => h("td", null, h("input", { id: "s" + i + "soll" + d + t, type: "number", min: "0", step: "1", inputmode: "numeric", value: s.soll[d][t] || "", placeholder: "0", "data-soll": i, "aria-label": t + " " + (d === "ab" ? "Abbau" : "Aufbau"),
+      oninput: e => { const n = parseInt(e.target.value) || 0; if (n) s.soll[d][t] = n; else delete s.soll[d][t]; document.querySelectorAll('[data-soll="' + i + '"]').forEach(x => x.classList.remove("invalid")); } }));
+    const soll = h("table", { class: "sollt" }, h("thead", null, h("tr", null, h("th", null, "Gerätetyp"), h("th", { class: "ab" }, "Abbau (alt)"), h("th", { class: "auf" }, "Aufbau (neu)"))),
+      h("tbody", null, TYPE_NAMES.map(t => h("tr", null, h("td", null, t), cell("ab", t), cell("auf", t)))));
     box.append(h("section", { class: "card sitecard" },
       h("div", { class: "sch" }, h("h2", null, fArt === "tour" ? "Standort " + (i + 1) : "Standort"), fSites.length > 1 ? h("button", { type: "button", class: "btn link", onclick: () => { fSites.splice(i, 1); renderSites(); updCode(); } }, "Entfernen") : null),
       inp("gebaeude", "Gebäude / Bezeichnung", false, "z. B. HWLC"),
       h("div", { class: "row2" }, inp("strasse", "Strasse und Nr.", true, "Hardturmstrasse 1"), h("div", { class: "row2" }, inp("plz", "PLZ", true, "8005", { inputmode: "numeric" }), inp("ort", "Ort", true, "Zürich"))),
       h("div", { class: "row2" }, inp("kontakt", "Ansprechperson vor Ort", true, "Vorname Nachname"), inp("telefon", "Telefon", true, "044 123 45 67", { type: "tel", inputmode: "tel" })),
       inp("zutritt", "Zutritt & Hinweise", false, "Badge am Empfang, Parkplatz hinten, Lift B"),
-      h("div", { class: "fld" }, h("span", { class: "l" }, "Soll: Anzahl Geräte ", h("span", { class: "req" }, "✱")), soll)));
+      h("div", { class: "fld" }, h("span", { class: "l" }, "Soll: Anzahl Geräte ", h("span", { class: "req" }, "✱")), h("div", { class: "hint", style: "margin:0" }, "Austausch = alt abbauen und neu aufbauen. Beides eintragen, z. B. 2 Monitore ab und 1 Monitor auf."), soll)));
   });
 }
 function renderFormMat(j) {
@@ -718,7 +812,7 @@ $("jobForm").addEventListener("submit", async e => {
     [["strasse", "Strasse"], ["plz", "PLZ"], ["ort", "Ort"], ["kontakt", "Ansprechperson"], ["telefon", "Telefon"]].forEach(([k, l]) => { if (!(s[k] || "").trim()) { bad($("s" + i + k)); miss.push(pre + l); } });
     if (s.plz && !/^\d{4,5}$/.test(s.plz.trim())) { bad($("s" + i + "plz")); miss.push(pre + "PLZ ungültig"); }
     if (s.telefon && s.telefon.replace(/\D/g, "").length < 9) { bad($("s" + i + "telefon")); miss.push(pre + "Telefonnummer zu kurz"); }
-    if (!Object.values(s.soll).some(v => v > 0)) { document.querySelectorAll('[data-soll="' + i + '"]').forEach(bad); miss.push(pre + "Soll: mindestens ein Gerät"); }
+    if (![...Object.values(s.soll.ab || {}), ...Object.values(s.soll.auf || {})].some(v => v > 0)) { document.querySelectorAll('[data-soll="' + i + '"]').forEach(bad); miss.push(pre + "Soll: mindestens ein Gerät"); }
   });
   if (miss.length) {
     $("fErr").innerHTML = ""; $("fErr").append("Noch nicht vollständig:", h("ul", null, miss.map(m => h("li", null, m))));
@@ -727,7 +821,7 @@ $("jobForm").addEventListener("submit", async e => {
   const days = (Date.parse(d) - Date.parse(today())) / 864e5;
   if (days > 60 && !e.submitter?.dataset.ok) return ask("Datum prüfen", "Der Auftrag ist am " + fmtDate(d) + ", also in " + Math.round(days) + " Tagen. Stimmt das?", [{ label: "Korrigieren", fn: () => $("fDatum").focus() }, { label: "Ja, stimmt", cls: "primary", fn: () => { $("fGo").dataset.ok = 1; $("fGo").click(); delete $("fGo").dataset.ok; } }]);
   const material = [...document.querySelectorAll("[data-mat]")].map(x => ({ name: x.dataset.mat, qty: parseInt(x.value) || 0 })).filter(m => m.qty > 0);
-  const p = { id: formJob || undefined, art: fArt, kunde: $("fKunde").value.trim(), datum: d, zeit_von: $("fVon").value, zeit_bis: $("fBis").value, wo: $("fWo").value.trim(), lead: $("fLead").value,
+  const p = { id: formJob || undefined, art: fArt, tausch: $("fTausch").value, kunde: $("fKunde").value.trim(), datum: d, zeit_von: $("fVon").value, zeit_bis: $("fBis").value, wo: $("fWo").value.trim(), lead: $("fLead").value,
     material, notes: $("fNotes").value.trim(), sites: fSites.map(s => ({ id: s.id, gebaeude: s.gebaeude, strasse: s.strasse, plz: s.plz, ort: s.ort, kontakt: s.kontakt, telefon: s.telefon, zutritt: s.zutritt, soll: s.soll })) };
   $("fGo").disabled = true; $("fErr").textContent = "Speichere …";
   try {
@@ -787,12 +881,16 @@ async function exportJob(j) {
     ["Nr", "Gebäude", "Adresse", "Ansprechperson", "Telefon", "Zutritt"], ...j.sites.map((s, i) => [i + 1, s.gebaeude || "", addr(s), s.kontakt, s.telefon, s.zutritt || ""])];
   XLSX.utils.book_append_sheet(wb, sheet(info, [16, 22, 34, 22, 16, 30]), "Auftrag");
   const sc = scansOf(j.id);
-  XLSX.utils.book_append_sheet(wb, sheet([["Nr", "Asset-ID", "Gerätetyp", "Ersetzt durch", "Standort", "Gebäude", "Adresse", "Etage", "Raum", "Büro", "Arbeitsplatz", "Zustand", "Notiz", "Erfasst", "Erfasst durch"],
-    ...sc.map((s, i) => [i + 1, s.asset, devType(s.asset) || "Unbekannt", s.neu || "", No(s.site_id), S(s.site_id).gebaeude || "", addr(S(s.site_id)), s.etage || "", s.raum || "", s.buero || "", s.place || "", condTxt(s.cond), s.note || "", new Date(s.ts).toLocaleString("de-CH"), s.by || ""])],
-    [5, 16, 20, 16, 9, 14, 30, 9, 9, 14, 12, 15, 24, 17, 20]), "Geräte");
-  const si = [["Standort", "Gebäude", "Adresse", "Gerätetyp", "Soll", "Ist", "Differenz"]];
-  j.sites.forEach((s, i) => { const ist = counts(j.id, s.id), soll = sollOf(j, s.id); [...new Set([...Object.keys(soll), ...Object.keys(ist)])].forEach(k => si.push([i + 1, s.gebaeude || "", addr(s), k, soll[k] || 0, ist[k] || 0, (ist[k] || 0) - (soll[k] || 0)])); });
-  XLSX.utils.book_append_sheet(wb, sheet(si, [9, 14, 30, 20, 7, 7, 10]), "Soll-Ist");
+  const sw = swapsOf(j.id), swNo = {}; sw.forEach(g => swNo[g.grp] = g.no);
+  XLSX.utils.book_append_sheet(wb, sheet([["Nr", "Asset-ID", "Gerätetyp", "Richtung", "Art", "Austausch-Nr", "Standort", "Gebäude", "Adresse", "Etage", "Raum", "Büro", "Arbeitsplatz", "Zustand", "Notiz", "Erfasst", "Erfasst durch"],
+    ...sc.map((s, i) => [i + 1, s.asset, devType(s.asset) || "Unbekannt", dirOf(s) === "ab" ? "Abbau" : "Aufbau", s.art === "tausch" ? "Austausch" : "Einzeln", swNo[s.grp] || "", No(s.site_id), S(s.site_id).gebaeude || "", addr(S(s.site_id)), s.etage || "", s.raum || "", s.buero || "", s.place || "", condTxt(s.cond), s.note || "", new Date(s.ts).toLocaleString("de-CH"), s.by || ""])],
+    [5, 16, 20, 10, 11, 12, 9, 14, 30, 9, 9, 14, 12, 15, 24, 17, 20]), "Geräte");
+  XLSX.utils.book_append_sheet(wb, sheet([["Austausch-Nr", "Alt (Abbau)", "Typ alt", "Neu (Aufbau)", "Typ neu", "Standort", "Adresse", "Etage", "Raum", "Arbeitsplatz", "Erfasst durch"],
+    ...sw.map(g => { const f = g.alt[0] || g.neu[0] || {}; return [g.no, g.alt.map(x => x.asset).join(", "), [...new Set(g.alt.map(x => devType(x.asset) || "Unbekannt"))].join(", "), g.neu.map(x => x.asset).join(", "), [...new Set(g.neu.map(x => devType(x.asset) || "Unbekannt"))].join(", "), No(g.site_id), addr(S(g.site_id)), f.etage || "", f.raum || "", f.place || "", [...new Set([...g.alt, ...g.neu].map(x => x.by))].join(", ")]; })],
+    [12, 28, 18, 28, 18, 9, 30, 9, 9, 12, 20]), "Austausch");
+  const si = [["Standort", "Gebäude", "Adresse", "Richtung", "Gerätetyp", "Soll", "Ist", "Differenz"]];
+  j.sites.forEach((s, i) => DIRS.forEach(([d, l]) => { const ist = counts(j.id, s.id, d), soll = sollOf(j, s.id, d); [...new Set([...Object.keys(soll), ...Object.keys(ist)])].forEach(k => si.push([i + 1, s.gebaeude || "", addr(s), l, k, soll[k] || 0, ist[k] || 0, (ist[k] || 0) - (soll[k] || 0)])); }));
+  XLSX.utils.book_append_sheet(wb, sheet(si, [9, 14, 30, 10, 20, 7, 7, 10]), "Soll-Ist");
   const ms = matsOf(j.id).sort((a, b) => No(a.site_id) - No(b.site_id) || a.item.localeCompare(b.item));
   XLSX.utils.book_append_sheet(wb, sheet([["Standort", "Gebäude", "Adresse", "Material", "Anzahl", "Etage", "Raum", "Arbeitsplatz", "Erfasst durch"], ...ms.map(m => [No(m.site_id), S(m.site_id).gebaeude || "", addr(S(m.site_id)), m.item, m.qty, m.etage || "", m.raum || "", m.place || "", m.by || ""])], [9, 14, 30, 20, 8, 9, 9, 12, 20]), "Material");
   const tot = {}; ms.forEach(m => { const k = No(m.site_id) + "|" + m.item; tot[k] = (tot[k] || 0) + m.qty; });

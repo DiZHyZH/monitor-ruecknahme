@@ -86,9 +86,16 @@
   <div class="scangrid">
     <div class="col">
       <section class="card scancard dir-ab" id="scanCard">
-        <div class="dirseg" id="dirSeg" role="group" aria-label="Richtung">
-          <button type="button" data-v="ab" aria-pressed="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 4v14M6 12l6 6 6-6"/></svg>Abbau<small id="dirAbN"></small></button>
-          <button type="button" data-v="auf" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 20V6M6 12l6-6 6 6"/></svg>Aufbau<small id="dirAufN"></small></button>
+        <div class="dirseg" id="dirSeg" role="group" aria-label="Art der Arbeit">
+          <button type="button" data-v="tausch" aria-pressed="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 8h14l-4-4M20 16H6l4 4"/></svg>Austausch</button>
+          <button type="button" data-v="auf" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 20V6M6 12l6-6 6 6"/></svg>Aufbau</button>
+          <button type="button" data-v="ab" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 4v14M6 12l6 6 6-6"/></svg>Abbau</button>
+        </div>
+        <div class="swap" id="swapBox" hidden>
+          <div class="ratio"><span>Verhältnis alt : neu</span><div class="chips small" id="ratioSel"><button type="button" data-v="1:1" aria-pressed="true">1 : 1</button><button type="button" data-v="2:1" aria-pressed="false">2 : 1</button><button type="button" data-v="1:2" aria-pressed="false">1 : 2</button><button type="button" data-v="frei" aria-pressed="false">frei</button></div></div>
+          <div class="swapstep" id="swapStep"></div>
+          <div class="swapcols"><div><span class="l ab">Alt (Abbau)</span><div id="swapAlt" class="swapids"></div></div><div class="arr">→</div><div><span class="l auf">Neu (Aufbau)</span><div id="swapNeu" class="swapids"></div></div></div>
+          <div class="swapbtns"><button type="button" class="btn" id="swapMoreAlt">+ weiteres altes Gerät</button><button type="button" class="btn" id="swapMoreNeu">+ weiteres neues Gerät</button><button type="button" class="btn" id="swapNew">Neuer Austausch</button></div>
         </div>
         <form id="scanForm" class="scanrow" autocomplete="off">
           <input id="scanIn" class="mono big" type="text" autocapitalize="characters" spellcheck="false" placeholder="Asset-ID scannen oder tippen" aria-label="Asset-ID">
@@ -107,13 +114,10 @@
             <div class="fld"><label for="dRaum">Raum</label><input id="dRaum" type="text" placeholder="214"></div>
             <div class="fld"><label for="dBuero">Büro</label><input id="dBuero" type="text" placeholder="Einkauf"></div>
           </div>
-          <div class="row2">
-            <div class="fld"><label for="dPlatz">Arbeitsplatz</label><input id="dPlatz" type="text" placeholder="14"></div>
-            <div class="fld"><label for="dNeu" id="dNeuL">Ersetzt durch</label><input id="dNeu" class="mono" type="text" placeholder="neue Asset-ID" autocapitalize="characters" spellcheck="false"></div>
-          </div>
+          <div class="fld"><label for="dPlatz">Arbeitsplatz</label><input id="dPlatz" type="text" placeholder="14"></div>
           <div class="fld"><label>Zustand</label><div class="chips" id="dCond"><button type="button" data-v="ok" aria-pressed="true">OK</button><button type="button" data-v="gebraucht" aria-pressed="false">Gebrauchsspuren</button><button type="button" data-v="defekt" aria-pressed="false">Defekt</button></div></div>
           <div class="fld"><label for="dNote">Notiz</label><input id="dNote" type="text" placeholder="z. B. ohne Fuss"></div>
-          <p class="hint">Etage, Raum und Büro bleiben stehen. Platz, Ersetzt durch, Zustand und Notiz werden nach jedem Gerät geleert.</p>
+          <p class="hint">Etage, Raum und Büro bleiben stehen. Arbeitsplatz, Zustand und Notiz gelten für den nächsten Vorgang und werden danach geleert.</p>
         </details>
       </section>
       <section class="card matcard">
@@ -128,7 +132,7 @@
       <section class="card listcard">
         <div class="listhead"><h2>Erfasst <small id="listCount"></small></h2>
           <div class="seg2 small" role="group"><button type="button" id="lsSite" aria-pressed="true">Dieser Standort</button><button type="button" id="lsAll" aria-pressed="false">Alle</button></div></div>
-        <div class="tablewrap"><table class="tbl"><thead><tr><th>#</th><th>Asset-ID</th><th>Typ</th><th></th><th class="hide-s">Ort</th><th class="hide-s">Von</th><th></th></tr></thead><tbody id="scanRows"></tbody></table></div>
+        <div class="tablewrap"><table class="tbl"><thead><tr><th>#</th><th>Asset-ID</th><th>Typ</th><th>Art</th><th class="hide-s">Ort</th><th class="hide-s">Von</th><th></th></tr></thead><tbody id="scanRows"></tbody></table></div>
         <div id="scanEmpty" class="empty">Noch nichts erfasst an diesem Standort.</div>
       </section>
     </div>
@@ -152,7 +156,10 @@
         <div class="fld"><label for="fVon">Von <span class="req">✱</span></label><input id="fVon" type="time" step="900"></div>
         <div class="fld"><label for="fBis">Bis <span class="req">✱</span></label><input id="fBis" type="time" step="900"></div>
       </div>
-      <div class="fld"><label for="fLead">Lead vor Ort <span class="req">✱</span></label><select id="fLead"></select></div>
+      <div class="row2">
+        <div class="fld"><label for="fLead">Lead vor Ort <span class="req">✱</span></label><select id="fLead"></select></div>
+        <div class="fld"><label for="fTausch">Austausch alt : neu</label><select id="fTausch"><option value="1:1">1 : 1 (Normalfall)</option><option value="2:1">2 : 1 (z. B. 2 Monitore → 1 Ultrawide)</option><option value="1:2">1 : 2</option><option value="frei">frei, vor Ort entscheiden</option></select></div>
+      </div>
       <div class="codeprev">Auftragscode: <b id="fCode">–</b></div>
     </section>
     <div id="fSites"></div>

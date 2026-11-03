@@ -45,6 +45,7 @@ create table if not exists public.jobs (
   wo          text,
   lead        uuid references public.profiles(id),
   material    jsonb not null default '[]'::jsonb,
+  tausch      text not null default '1:1',
   notes       text,
   status      text not null default 'geplant' check (status in ('geplant','aktiv','abgeschlossen')),
   created_by  uuid,
@@ -84,6 +85,9 @@ alter table public.scans alter column rollout drop not null;
 alter table public.scans add column if not exists job_id  uuid references public.jobs(id) on delete cascade;
 alter table public.scans add column if not exists site_id uuid;
 alter table public.scans add column if not exists dir text not null default 'ab';
+alter table public.scans add column if not exists art text not null default 'einzeln';
+alter table public.scans add column if not exists grp text;
+alter table public.jobs  add column if not exists tausch text not null default '1:1';
 do $$ begin
   alter table public.scans add constraint scans_dir_chk check (dir in ('ab','auf'));
 exception when duplicate_object then null; end $$;
@@ -219,12 +223,14 @@ begin
   if v_id is null then
     v_code := base;
     while exists (select 1 from public.jobs where code = v_code) loop n := n + 1; v_code := base || '_' || n; end loop;
-    insert into public.jobs(code, art, kunde, datum, zeit_von, zeit_bis, wo, lead, material, notes, created_by)
-    values (v_code, v_art, v_kunde, v_datum, v_von, v_bis, nullif(trim(p->>'wo'),''), v_lead, coalesce(p->'material','[]'::jsonb), nullif(trim(p->>'notes'),''), auth.uid())
+    insert into public.jobs(code, art, kunde, datum, zeit_von, zeit_bis, wo, lead, material, tausch, notes, created_by)
+    values (v_code, v_art, v_kunde, v_datum, v_von, v_bis, nullif(trim(p->>'wo'),''), v_lead, coalesce(p->'material','[]'::jsonb),
+            case when p->>'tausch' ~ '^(\d:\d|frei)$' then p->>'tausch' else '1:1' end, nullif(trim(p->>'notes'),''), auth.uid())
     returning id into v_id;
   else
     update public.jobs set art = v_art, kunde = v_kunde, datum = v_datum, zeit_von = v_von, zeit_bis = v_bis,
       wo = nullif(trim(p->>'wo'),''), lead = v_lead, material = coalesce(p->'material','[]'::jsonb),
+      tausch = case when p->>'tausch' ~ '^(\d:\d|frei)$' then p->>'tausch' else tausch end,
       notes = nullif(trim(p->>'notes'),''), updated_at = now()
     where id = v_id;
     if not found then raise exception 'not_found'; end if;
@@ -340,8 +346,8 @@ begin
   if exists (select 1 from public.scans where id = p->>'id') then
     return jsonb_build_object('status','added','id',p->>'id');
   end if;
-  insert into public.scans(id, job_id, site_id, dir, asset, neu, etage, raum, buero, place, cond, note, "by", user_id, ts)
-  values (p->>'id', p_job, v_site, v_dir, p->>'asset', p->>'neu', p->>'etage', p->>'raum', p->>'buero', p->>'place',
+  insert into public.scans(id, job_id, site_id, dir, art, grp, asset, neu, etage, raum, buero, place, cond, note, "by", user_id, ts)
+  values (p->>'id', p_job, v_site, v_dir, case when p->>'art' = 'tausch' then 'tausch' else 'einzeln' end, nullif(p->>'grp',''), p->>'asset', p->>'neu', p->>'etage', p->>'raum', p->>'buero', p->>'place',
           coalesce(p->>'cond','ok'), p->>'note', public.mr_me(), auth.uid(), (p->>'ts')::bigint);
   update public.jobs set status = 'aktiv', updated_at = now() where id = p_job and status = 'geplant';
   return jsonb_build_object('status','added','id',p->>'id');
