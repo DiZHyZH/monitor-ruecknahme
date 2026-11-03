@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0090d4">
+<title>Installieren · Monitor-Rücknahme</title>
+<link rel="icon" href="icon-192.png">
+<style>
+[hidden]{display:none!important}
+:root{
+  --bg:#eef2f6; --surface:#ffffff; --surface-2:#f6f8fb; --fg:#0e1a24; --muted:#647487; --line:#e1e7ee;
+  --accent:#0090d4; --accent-strong:#0077b3; --accent-soft:#e1f2fb; --ok:#14804a; --ok-soft:#e3f4ea; --warn:#a85f00; --warn-soft:#fdf1df;
+  --shadow:0 1px 2px rgba(14,26,36,.05),0 6px 20px rgba(14,26,36,.06);
+  --f:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; --mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b1219; --surface:#141e28; --surface-2:#1a2632; --fg:#e8eef4; --muted:#8fa0b2; --line:#243342;
+  --accent:#2fb0ec; --accent-strong:#5cc3f2; --accent-soft:#11324a; --ok:#4cc184; --ok-soft:#123224; --warn:#eaa743; --warn-soft:#3a2a10;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--f);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.wrap{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 56px;display:flex;flex-direction:column;gap:14px}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);margin:0 calc(-1*max(16px,env(safe-area-inset-left,0px)));padding:10px max(16px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:10px}
+.logo{flex:none;background:#fff;border-radius:8px;padding:4px 6px;box-shadow:0 0 0 1px var(--line);display:flex}
+.logo img{height:22px;width:auto;display:block}
+header b{flex:1;font-size:17px}
+.back{background:var(--accent);color:#fff;text-decoration:none;font-weight:600;font-size:14px;border-radius:999px;padding:8px 14px}
+h1{font-size:28px;line-height:1.15;letter-spacing:-.02em;margin:18px 0 0;text-wrap:balance}
+.lead{color:var(--muted);margin:0;max-width:60ch}
+nav{display:flex;flex-wrap:wrap;gap:6px}
+nav a{font-size:13.5px;font-weight:600;color:var(--accent-strong);background:var(--accent-soft);text-decoration:none;border-radius:999px;padding:6px 12px}
+section{background:var(--surface);border-radius:18px;padding:18px;box-shadow:var(--shadow);scroll-margin-top:70px}
+section h2{margin:0 0 4px;font-size:19px;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+section h2 .ic{flex:none;width:32px;height:32px;border-radius:10px;background:var(--accent-soft);color:var(--accent-strong);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800}
+section > p{color:var(--muted);margin:0 0 10px}
+ol.steps{list-style:none;counter-reset:s;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start}
+ol.steps li::before{content:counter(s);width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+ul{margin:8px 0 0;padding-left:20px}
+ul li{margin:4px 0}
+b,strong{font-weight:650}
+code,.k{font-family:var(--mono);font-size:.9em;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;overflow-wrap:anywhere}
+.ui{font-weight:650;color:var(--accent-strong)}
+.box{border-radius:12px;padding:12px 14px;margin-top:12px;font-size:15px}
+.box.tip{background:var(--ok-soft)} .box.tip b:first-child{color:var(--ok)}
+.box.warn{background:var(--warn-soft)} .box.warn b:first-child{color:var(--warn)}
+.roles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+@media (max-width:520px){.roles{grid-template-columns:1fr}}
+.role{background:var(--surface-2);border-radius:12px;padding:12px 14px}
+.role h3{margin:0 0 6px;font-size:15px}
+.role ol{margin:0;padding-left:18px;font-size:15px}
+.role li{margin:3px 0}
+.status{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.status div{display:flex;gap:10px;align-items:center;font-size:15px}
+.dot{flex:none;width:10px;height:10px;border-radius:50%}
+.dot.on{background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)} .dot.wait{background:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)} .dot.off{background:var(--muted)}
+details{border-top:1px solid var(--line);padding:10px 0}
+details:first-of-type{border-top:0}
+summary{cursor:pointer;font-weight:650;list-style:none;display:flex;justify-content:space-between;gap:10px}
+summary::after{content:"+";color:var(--accent);font-weight:800}
+details[open] summary::after{content:"–"}
+details p,details ul{margin:6px 0 0;color:var(--muted)}
+footer{text-align:center;font-size:12.5px;color:var(--muted);margin-top:10px}
+footer b{color:var(--fg)}
+a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.qr{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.qr .code{flex:none;width:170px;background:#fff;border-radius:14px;padding:10px}
+.qr .code svg{display:block;width:100%;height:auto}
+.qr .txt{flex:1;min-width:200px}
+.big{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--accent-strong);overflow-wrap:anywhere}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.tabs a{font-size:13.5px;font-weight:600;color:var(--fg);background:var(--surface-2);text-decoration:none;border-radius:999px;padding:6px 12px}
+.icon{display:inline-flex;vertical-align:-6px;width:26px;height:26px;border-radius:7px;background:#0090d4;align-items:center;justify-content:center;margin:0 2px}
+</style></head><body>
+<div class="wrap">
+  <header><span class="logo"><img src="dplan-logo.png" alt="dplan IT Services"></span><b>Installieren</b><a class="back" href="./">Zur App</a></header>
+  <h1>App installieren</h1>
+  <p class="lead">Kein App Store, kein Konto. Die App wird direkt aus dem Browser installiert und läuft danach wie eine normale App, auch offline.</p>
+
+  <section>
+    <h2><span class="ic">1</span>Link öffnen</h2>
+    <div class="qr">
+      <div class="code" aria-label="QR-Code zur App"><svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 268 268"  preserveAspectRatio="xMinYMin meet"><rect width="100%" height="100%" fill="white" cx="0" cy="0"/><path d="M2,2l8,0 0,8 -8,0 0,-8z M10,2l8,0 0,8 -8,0 0,-8z M18,2l8,0 0,8 -8,0 0,-8z M26,2l8,0 0,8 -8,0 0,-8z M34,2l8,0 0,8 -8,0 0,-8z M42,2l8,0 0,8 -8,0 0,-8z M50,2l8,0 0,8 -8,0 0,-8z M74,2l8,0 0,8 -8,0 0,-8z M82,2l8,0 0,8 -8,0 0,-8z M90,2l8,0 0,8 -8,0 0,-8z M98,2l8,0 0,8 -8,0 0,-8z M114,2l8,0 0,8 -8,0 0,-8z M122,2l8,0 0,8 -8,0 0,-8z M146,2l8,0 0,8 -8,0 0,-8z M154,2l8,0 0,8 -8,0 0,-8z M170,2l8,0 0,8 -8,0 0,-8z M186,2l8,0 0,8 -8,0 0,-8z M210,2l8,0 0,8 -8,0 0,-8z M218,2l8,0 0,8 -8,0 0,-8z M226,2l8,0 0,8 -8,0 0,-8z M234,2l8,0 0,8 -8,0 0,-8z M242,2l8,0 0,8 -8,0 0,-8z M250,2l8,0 0,8 -8,0 0,-8z M258,2l8,0 0,8 -8,0 0,-8z M2,10l8,0 0,8 -8,0 0,-8z M50,10l8,0 0,8 -8,0 0,-8z M74,10l8,0 0,8 -8,0 0,-8z M90,10l8,0 0,8 -8,0 0,-8z M98,10l8,0 0,8 -8,0 0,-8z M122,10l8,0 0,8 -8,0 0,-8z M130,10l8,0 0,8 -8,0 0,-8z M138,10l8,0 0,8 -8,0 0,-8z M162,10l8,0 0,8 -8,0 0,-8z M186,10l8,0 0,8 -8,0 0,-8z M194,10l8,0 0,8 -8,0 0,-8z M210,10l8,0 0,8 -8,0 0,-8z M258,10l8,0 0,8 -8,0 0,-8z M2,18l8,0 0,8 -8,0 0,-8z M18,18l8,0 0,8 -8,0 0,-8z M26,18l8,0 0,8 -8,0 0,-8z M34,18l8,0 0,8 -8,0 0,-8z M50,18l8,0 0,8 -8,0 0,-8z M74,18l8,0 0,8 -8,0 0,-8z M82,18l8,0 0,8 -8,0 0,-8z M90,18l8,0 0,8 -8,0 0,-8z M114,18l8,0 0,8 -8,0 0,-8z M122,18l8,0 0,8 -8,0 0,-8z M138,18l8,0 0,8 -8,0 0,-8z M162,18l8,0 0,8 -8,0 0,-8z M186,18l8,0 0,8 -8,0 0,-8z M194,18l8,0 0,8 -8,0 0,-8z M210,18l8,0 0,8 -8,0 0,-8z M226,18l8,0 0,8 -8,0 0,-8z M234,18l8,0 0,8 -8,0 0,-8z M242,18l8,0 0,8 -8,0 0,-8z M258,18l8,0 0,8 -8,0 0,-8z M2,26l8,0 0,8 -8,0 0,-8z M18,26l8,0 0,8 -8,0 0,-8z M26,26l8,0 0,8 -8,0 0,-8z M34,26l8,0 0,8 -8,0 0,-8z M50,26l8,0 0,8 -8,0 0,-8z M74,26l8,0 0,8 -8,0 0,-8z M82,26l8,0 0,8 -8,0 0,-8z M90,26l8,0 0,8 -8,0 0,-8z M106,26l8,0 0,8 -8,0 0,-8z M138,26l8,0 0,8 -8,0 0,-8z M154,26l8,0 0,8 -8,0 0,-8z M170,26l8,0 0,8 -8,0 0,-8z M210,26l8,0 0,8 -8,0 0,-8z M226,26l8,0 0,8 -8,0 0,-8z M234,26l8,0 0,8 -8,0 0,-8z M242,26l8,0 0,8 -8,0 0,-8z M258,26l8,0 0,8 -8,0 0,-8z M2,34l8,0 0,8 -8,0 0,-8z M18,34l8,0 0,8 -8,0 0,-8z M26,34l8,0 0,8 -8,0 0,-8z M34,34l8,0 0,8 -8,0 0,-8z M50,34l8,0 0,8 -8,0 0,-8z M74,34l8,0 0,8 -8,0 0,-8z M82,34l8,0 0,8 -8,0 0,-8z M98,34l8,0 0,8 -8,0 0,-8z M130,34l8,0 0,8 -8,0 0,-8z M154,34l8,0 0,8 -8,0 0,-8z M170,34l8,0 0,8 -8,0 0,-8z M186,34l8,0 0,8 -8,0 0,-8z M194,34l8,0 0,8 -8,0 0,-8z M210,34l8,0 0,8 -8,0 0,-8z M226,34l8,0 0,8 -8,0 0,-8z M234,34l8,0 0,8 -8,0 0,-8z M242,34l8,0 0,8 -8,0 0,-8z M258,34l8,0 0,8 -8,0 0,-8z M2,42l8,0 0,8 -8,0 0,-8z M50,42l8,0 0,8 -8,0 0,-8z M66,42l8,0 0,8 -8,0 0,-8z M90,42l8,0 0,8 -8,0 0,-8z M106,42l8,0 0,8 -8,0 0,-8z M114,42l8,0 0,8 -8,0 0,-8z M138,42l8,0 0,8 -8,0 0,-8z M162,42l8,0 0,8 -8,0 0,-8z M194,42l8,0 0,8 -8,0 0,-8z M210,42l8,0 0,8 -8,0 0,-8z M258,42l8,0 0,8 -8,0 0,-8z M2,50l8,0 0,8 -8,0 0,-8z M10,50l8,0 0,8 -8,0 0,-8z M18,50l8,0 0,8 -8,0 0,-8z M26,50l8,0 0,8 -8,0 0,-8z M34,50l8,0 0,8 -8,0 0,-8z M42,50l8,0 0,8 -8,0 0,-8z M50,50l8,0 0,8 -8,0 0,-8z M66,50l8,0 0,8 -8,0 0,-8z M82,50l8,0 0,8 -8,0 0,-8z M98,50l8,0 0,8 -8,0 0,-8z M114,50l8,0 0,8 -8,0 0,-8z M130,50l8,0 0,8 -8,0 0,-8z M146,50l8,0 0,8 -8,0 0,-8z M162,50l8,0 0,8 -8,0 0,-8z M178,50l8,0 0,8 -8,0 0,-8z M194,50l8,0 0,8 -8,0 0,-8z M210,50l8,0 0,8 -8,0 0,-8z M218,50l8,0 0,8 -8,0 0,-8z M226,50l8,0 0,8 -8,0 0,-8z M234,50l8,0 0,8 -8,0 0,-8z M242,50l8,0 0,8 -8,0 0,-8z M250,50l8,0 0,8 -8,0 0,-8z M258,50l8,0 0,8 -8,0 0,-8z M82,58l8,0 0,8 -8,0 0,-8z M90,58l8,0 0,8 -8,0 0,-8z M98,58l8,0 0,8 -8,0 0,-8z M114,58l8,0 0,8 -8,0 0,-8z M138,58l8,0 0,8 -8,0 0,-8z M154,58l8,0 0,8 -8,0 0,-8z M162,58l8,0 0,8 -8,0 0,-8z M170,58l8,0 0,8 -8,0 0,-8z M178,58l8,0 0,8 -8,0 0,-8z M186,58l8,0 0,8 -8,0 0,-8z M194,58l8,0 0,8 -8,0 0,-8z M2,66l8,0 0,8 -8,0 0,-8z M26,66l8,0 0,8 -8,0 0,-8z M42,66l8,0 0,8 -8,0 0,-8z M50,66l8,0 0,8 -8,0 0,-8z M66,66l8,0 0,8 -8,0 0,-8z M106,66l8,0 0,8 -8,0 0,-8z M114,66l8,0 0,8 -8,0 0,-8z M122,66l8,0 0,8 -8,0 0,-8z M130,66l8,0 0,8 -8,0 0,-8z M146,66l8,0 0,8 -8,0 0,-8z M154,66l8,0 0,8 -8,0 0,-8z M162,66l8,0 0,8 -8,0 0,-8z M170,66l8,0 0,8 -8,0 0,-8z M186,66l8,0 0,8 -8,0 0,-8z M202,66l8,0 0,8 -8,0 0,-8z M218,66l8,0 0,8 -8,0 0,-8z M2,74l8,0 0,8 -8,0 0,-8z M18,74l8,0 0,8 -8,0 0,-8z M34,74l8,0 0,8 -8,0 0,-8z M66,74l8,0 0,8 -8,0 0,-8z M82,74l8,0 0,8 -8,0 0,-8z M114,74l8,0 0,8 -8,0 0,-8z M130,74l8,0 0,8 -8,0 0,-8z M162,74l8,0 0,8 -8,0 0,-8z M194,74l8,0 0,8 -8,0 0,-8z M202,74l8,0 0,8 -8,0 0,-8z M210,74l8,0 0,8 -8,0 0,-8z M218,74l8,0 0,8 -8,0 0,-8z M250,74l8,0 0,8 -8,0 0,-8z M258,74l8,0 0,8 -8,0 0,-8z M2,82l8,0 0,8 -8,0 0,-8z M10,82l8,0 0,8 -8,0 0,-8z M26,82l8,0 0,8 -8,0 0,-8z M34,82l8,0 0,8 -8,0 0,-8z M50,82l8,0 0,8 -8,0 0,-8z M98,82l8,0 0,8 -8,0 0,-8z M130,82l8,0 0,8 -8,0 0,-8z M138,82l8,0 0,8 -8,0 0,-8z M154,82l8,0 0,8 -8,0 0,-8z M162,82l8,0 0,8 -8,0 0,-8z M170,82l8,0 0,8 -8,0 0,-8z M178,82l8,0 0,8 -8,0 0,-8z M194,82l8,0 0,8 -8,0 0,-8z M202,82l8,0 0,8 -8,0 0,-8z M218,82l8,0 0,8 -8,0 0,-8z M226,82l8,0 0,8 -8,0 0,-8z M242,82l8,0 0,8 -8,0 0,-8z M250,82l8,0 0,8 -8,0 0,-8z M258,82l8,0 0,8 -8,0 0,-8z M2,90l8,0 0,8 -8,0 0,-8z M18,90l8,0 0,8 -8,0 0,-8z M26,90l8,0 0,8 -8,0 0,-8z M34,90l8,0 0,8 -8,0 0,-8z M42,90l8,0 0,8 -8,0 0,-8z M58,90l8,0 0,8 -8,0 0,-8z M66,90l8,0 0,8 -8,0 0,-8z M74,90l8,0 0,8 -8,0 0,-8z M90,90l8,0 0,8 -8,0 0,-8z M114,90l8,0 0,8 -8,0 0,-8z M130,90l8,0 0,8 -8,0 0,-8z M138,90l8,0 0,8 -8,0 0,-8z M154,90l8,0 0,8 -8,0 0,-8z M162,90l8,0 0,8 -8,0 0,-8z M226,90l8,0 0,8 -8,0 0,-8z M234,90l8,0 0,8 -8,0 0,-8z M250,90l8,0 0,8 -8,0 0,-8z M2,98l8,0 0,8 -8,0 0,-8z M10,98l8,0 0,8 -8,0 0,-8z M50,98l8,0 0,8 -8,0 0,-8z M66,98l8,0 0,8 -8,0 0,-8z M82,98l8,0 0,8 -8,0 0,-8z M98,98l8,0 0,8 -8,0 0,-8z M122,98l8,0 0,8 -8,0 0,-8z M154,98l8,0 0,8 -8,0 0,-8z M186,98l8,0 0,8 -8,0 0,-8z M194,98l8,0 0,8 -8,0 0,-8z M202,98l8,0 0,8 -8,0 0,-8z M210,98l8,0 0,8 -8,0 0,-8z M234,98l8,0 0,8 -8,0 0,-8z M258,98l8,0 0,8 -8,0 0,-8z M26,106l8,0 0,8 -8,0 0,-8z M58,106l8,0 0,8 -8,0 0,-8z M66,106l8,0 0,8 -8,0 0,-8z M74,106l8,0 0,8 -8,0 0,-8z M82,106l8,0 0,8 -8,0 0,-8z M98,106l8,0 0,8 -8,0 0,-8z M122,106l8,0 0,8 -8,0 0,-8z M130,106l8,0 0,8 -8,0 0,-8z M178,106l8,0 0,8 -8,0 0,-8z M194,106l8,0 0,8 -8,0 0,-8z M210,106l8,0 0,8 -8,0 0,-8z M226,106l8,0 0,8 -8,0 0,-8z M242,106l8,0 0,8 -8,0 0,-8z M250,106l8,0 0,8 -8,0 0,-8z M258,106l8,0 0,8 -8,0 0,-8z M2,114l8,0 0,8 -8,0 0,-8z M10,114l8,0 0,8 -8,0 0,-8z M26,114l8,0 0,8 -8,0 0,-8z M50,114l8,0 0,8 -8,0 0,-8z M66,114l8,0 0,8 -8,0 0,-8z M74,114l8,0 0,8 -8,0 0,-8z M82,114l8,0 0,8 -8,0 0,-8z M106,114l8,0 0,8 -8,0 0,-8z M114,114l8,0 0,8 -8,0 0,-8z M162,114l8,0 0,8 -8,0 0,-8z M178,114l8,0 0,8 -8,0 0,-8z M186,114l8,0 0,8 -8,0 0,-8z M202,114l8,0 0,8 -8,0 0,-8z M210,114l8,0 0,8 -8,0 0,-8z M218,114l8,0 0,8 -8,0 0,-8z M242,114l8,0 0,8 -8,0 0,-8z M250,114l8,0 0,8 -8,0 0,-8z M2,122l8,0 0,8 -8,0 0,-8z M10,122l8,0 0,8 -8,0 0,-8z M18,122l8,0 0,8 -8,0 0,-8z M34,122l8,0 0,8 -8,0 0,-8z M66,122l8,0 0,8 -8,0 0,-8z M82,122l8,0 0,8 -8,0 0,-8z M90,122l8,0 0,8 -8,0 0,-8z M106,122l8,0 0,8 -8,0 0,-8z M122,122l8,0 0,8 -8,0 0,-8z M138,122l8,0 0,8 -8,0 0,-8z M154,122l8,0 0,8 -8,0 0,-8z M170,122l8,0 0,8 -8,0 0,-8z M186,122l8,0 0,8 -8,0 0,-8z M194,122l8,0 0,8 -8,0 0,-8z M210,122l8,0 0,8 -8,0 0,-8z M218,122l8,0 0,8 -8,0 0,-8z M250,122l8,0 0,8 -8,0 0,-8z M2,130l8,0 0,8 -8,0 0,-8z M34,130l8,0 0,8 -8,0 0,-8z M50,130l8,0 0,8 -8,0 0,-8z M58,130l8,0 0,8 -8,0 0,-8z M66,130l8,0 0,8 -8,0 0,-8z M82,130l8,0 0,8 -8,0 0,-8z M90,130l8,0 0,8 -8,0 0,-8z M138,130l8,0 0,8 -8,0 0,-8z M154,130l8,0 0,8 -8,0 0,-8z M162,130l8,0 0,8 -8,0 0,-8z M170,130l8,0 0,8 -8,0 0,-8z M186,130l8,0 0,8 -8,0 0,-8z M194,130l8,0 0,8 -8,0 0,-8z M210,130l8,0 0,8 -8,0 0,-8z M226,130l8,0 0,8 -8,0 0,-8z M234,130l8,0 0,8 -8,0 0,-8z M250,130l8,0 0,8 -8,0 0,-8z M10,138l8,0 0,8 -8,0 0,-8z M18,138l8,0 0,8 -8,0 0,-8z M42,138l8,0 0,8 -8,0 0,-8z M66,138l8,0 0,8 -8,0 0,-8z M90,138l8,0 0,8 -8,0 0,-8z M130,138l8,0 0,8 -8,0 0,-8z M170,138l8,0 0,8 -8,0 0,-8z M186,138l8,0 0,8 -8,0 0,-8z M194,138l8,0 0,8 -8,0 0,-8z M202,138l8,0 0,8 -8,0 0,-8z M218,138l8,0 0,8 -8,0 0,-8z M234,138l8,0 0,8 -8,0 0,-8z M2,146l8,0 0,8 -8,0 0,-8z M26,146l8,0 0,8 -8,0 0,-8z M42,146l8,0 0,8 -8,0 0,-8z M50,146l8,0 0,8 -8,0 0,-8z M58,146l8,0 0,8 -8,0 0,-8z M66,146l8,0 0,8 -8,0 0,-8z M74,146l8,0 0,8 -8,0 0,-8z M82,146l8,0 0,8 -8,0 0,-8z M98,146l8,0 0,8 -8,0 0,-8z M106,146l8,0 0,8 -8,0 0,-8z M146,146l8,0 0,8 -8,0 0,-8z M162,146l8,0 0,8 -8,0 0,-8z M178,146l8,0 0,8 -8,0 0,-8z M194,146l8,0 0,8 -8,0 0,-8z M202,146l8,0 0,8 -8,0 0,-8z M242,146l8,0 0,8 -8,0 0,-8z M250,146l8,0 0,8 -8,0 0,-8z M258,146l8,0 0,8 -8,0 0,-8z M2,154l8,0 0,8 -8,0 0,-8z M10,154l8,0 0,8 -8,0 0,-8z M58,154l8,0 0,8 -8,0 0,-8z M74,154l8,0 0,8 -8,0 0,-8z M82,154l8,0 0,8 -8,0 0,-8z M98,154l8,0 0,8 -8,0 0,-8z M106,154l8,0 0,8 -8,0 0,-8z M122,154l8,0 0,8 -8,0 0,-8z M138,154l8,0 0,8 -8,0 0,-8z M146,154l8,0 0,8 -8,0 0,-8z M162,154l8,0 0,8 -8,0 0,-8z M170,154l8,0 0,8 -8,0 0,-8z M210,154l8,0 0,8 -8,0 0,-8z M218,154l8,0 0,8 -8,0 0,-8z M250,154l8,0 0,8 -8,0 0,-8z M258,154l8,0 0,8 -8,0 0,-8z M10,162l8,0 0,8 -8,0 0,-8z M18,162l8,0 0,8 -8,0 0,-8z M26,162l8,0 0,8 -8,0 0,-8z M50,162l8,0 0,8 -8,0 0,-8z M66,162l8,0 0,8 -8,0 0,-8z M90,162l8,0 0,8 -8,0 0,-8z M114,162l8,0 0,8 -8,0 0,-8z M122,162l8,0 0,8 -8,0 0,-8z M130,162l8,0 0,8 -8,0 0,-8z M138,162l8,0 0,8 -8,0 0,-8z M146,162l8,0 0,8 -8,0 0,-8z M178,162l8,0 0,8 -8,0 0,-8z M194,162l8,0 0,8 -8,0 0,-8z M202,162l8,0 0,8 -8,0 0,-8z M250,162l8,0 0,8 -8,0 0,-8z M258,162l8,0 0,8 -8,0 0,-8z M26,170l8,0 0,8 -8,0 0,-8z M42,170l8,0 0,8 -8,0 0,-8z M82,170l8,0 0,8 -8,0 0,-8z M90,170l8,0 0,8 -8,0 0,-8z M122,170l8,0 0,8 -8,0 0,-8z M130,170l8,0 0,8 -8,0 0,-8z M146,170l8,0 0,8 -8,0 0,-8z M154,170l8,0 0,8 -8,0 0,-8z M162,170l8,0 0,8 -8,0 0,-8z M178,170l8,0 0,8 -8,0 0,-8z M194,170l8,0 0,8 -8,0 0,-8z M202,170l8,0 0,8 -8,0 0,-8z M210,170l8,0 0,8 -8,0 0,-8z M234,170l8,0 0,8 -8,0 0,-8z M250,170l8,0 0,8 -8,0 0,-8z M258,170l8,0 0,8 -8,0 0,-8z M2,178l8,0 0,8 -8,0 0,-8z M10,178l8,0 0,8 -8,0 0,-8z M34,178l8,0 0,8 -8,0 0,-8z M42,178l8,0 0,8 -8,0 0,-8z M50,178l8,0 0,8 -8,0 0,-8z M66,178l8,0 0,8 -8,0 0,-8z M90,178l8,0 0,8 -8,0 0,-8z M122,178l8,0 0,8 -8,0 0,-8z M146,178l8,0 0,8 -8,0 0,-8z M162,178l8,0 0,8 -8,0 0,-8z M170,178l8,0 0,8 -8,0 0,-8z M178,178l8,0 0,8 -8,0 0,-8z M194,178l8,0 0,8 -8,0 0,-8z M210,178l8,0 0,8 -8,0 0,-8z M218,178l8,0 0,8 -8,0 0,-8z M258,178l8,0 0,8 -8,0 0,-8z M10,186l8,0 0,8 -8,0 0,-8z M26,186l8,0 0,8 -8,0 0,-8z M34,186l8,0 0,8 -8,0 0,-8z M42,186l8,0 0,8 -8,0 0,-8z M74,186l8,0 0,8 -8,0 0,-8z M82,186l8,0 0,8 -8,0 0,-8z M90,186l8,0 0,8 -8,0 0,-8z M98,186l8,0 0,8 -8,0 0,-8z M106,186l8,0 0,8 -8,0 0,-8z M114,186l8,0 0,8 -8,0 0,-8z M130,186l8,0 0,8 -8,0 0,-8z M146,186l8,0 0,8 -8,0 0,-8z M170,186l8,0 0,8 -8,0 0,-8z M202,186l8,0 0,8 -8,0 0,-8z M210,186l8,0 0,8 -8,0 0,-8z M234,186l8,0 0,8 -8,0 0,-8z M258,186l8,0 0,8 -8,0 0,-8z M2,194l8,0 0,8 -8,0 0,-8z M18,194l8,0 0,8 -8,0 0,-8z M34,194l8,0 0,8 -8,0 0,-8z M50,194l8,0 0,8 -8,0 0,-8z M58,194l8,0 0,8 -8,0 0,-8z M114,194l8,0 0,8 -8,0 0,-8z M122,194l8,0 0,8 -8,0 0,-8z M130,194l8,0 0,8 -8,0 0,-8z M138,194l8,0 0,8 -8,0 0,-8z M154,194l8,0 0,8 -8,0 0,-8z M170,194l8,0 0,8 -8,0 0,-8z M186,194l8,0 0,8 -8,0 0,-8z M194,194l8,0 0,8 -8,0 0,-8z M202,194l8,0 0,8 -8,0 0,-8z M210,194l8,0 0,8 -8,0 0,-8z M218,194l8,0 0,8 -8,0 0,-8z M226,194l8,0 0,8 -8,0 0,-8z M234,194l8,0 0,8 -8,0 0,-8z M250,194l8,0 0,8 -8,0 0,-8z M66,202l8,0 0,8 -8,0 0,-8z M74,202l8,0 0,8 -8,0 0,-8z M154,202l8,0 0,8 -8,0 0,-8z M162,202l8,0 0,8 -8,0 0,-8z M178,202l8,0 0,8 -8,0 0,-8z M194,202l8,0 0,8 -8,0 0,-8z M226,202l8,0 0,8 -8,0 0,-8z M234,202l8,0 0,8 -8,0 0,-8z M258,202l8,0 0,8 -8,0 0,-8z M2,210l8,0 0,8 -8,0 0,-8z M10,210l8,0 0,8 -8,0 0,-8z M18,210l8,0 0,8 -8,0 0,-8z M26,210l8,0 0,8 -8,0 0,-8z M34,210l8,0 0,8 -8,0 0,-8z M42,210l8,0 0,8 -8,0 0,-8z M50,210l8,0 0,8 -8,0 0,-8z M90,210l8,0 0,8 -8,0 0,-8z M98,210l8,0 0,8 -8,0 0,-8z M106,210l8,0 0,8 -8,0 0,-8z M114,210l8,0 0,8 -8,0 0,-8z M162,210l8,0 0,8 -8,0 0,-8z M170,210l8,0 0,8 -8,0 0,-8z M194,210l8,0 0,8 -8,0 0,-8z M210,210l8,0 0,8 -8,0 0,-8z M226,210l8,0 0,8 -8,0 0,-8z M234,210l8,0 0,8 -8,0 0,-8z M242,210l8,0 0,8 -8,0 0,-8z M250,210l8,0 0,8 -8,0 0,-8z M2,218l8,0 0,8 -8,0 0,-8z M50,218l8,0 0,8 -8,0 0,-8z M66,218l8,0 0,8 -8,0 0,-8z M82,218l8,0 0,8 -8,0 0,-8z M90,218l8,0 0,8 -8,0 0,-8z M106,218l8,0 0,8 -8,0 0,-8z M130,218l8,0 0,8 -8,0 0,-8z M154,218l8,0 0,8 -8,0 0,-8z M194,218l8,0 0,8 -8,0 0,-8z M226,218l8,0 0,8 -8,0 0,-8z M250,218l8,0 0,8 -8,0 0,-8z M2,226l8,0 0,8 -8,0 0,-8z M18,226l8,0 0,8 -8,0 0,-8z M26,226l8,0 0,8 -8,0 0,-8z M34,226l8,0 0,8 -8,0 0,-8z M50,226l8,0 0,8 -8,0 0,-8z M74,226l8,0 0,8 -8,0 0,-8z M82,226l8,0 0,8 -8,0 0,-8z M106,226l8,0 0,8 -8,0 0,-8z M114,226l8,0 0,8 -8,0 0,-8z M122,226l8,0 0,8 -8,0 0,-8z M130,226l8,0 0,8 -8,0 0,-8z M178,226l8,0 0,8 -8,0 0,-8z M194,226l8,0 0,8 -8,0 0,-8z M202,226l8,0 0,8 -8,0 0,-8z M210,226l8,0 0,8 -8,0 0,-8z M218,226l8,0 0,8 -8,0 0,-8z M226,226l8,0 0,8 -8,0 0,-8z M234,226l8,0 0,8 -8,0 0,-8z M258,226l8,0 0,8 -8,0 0,-8z M2,234l8,0 0,8 -8,0 0,-8z M18,234l8,0 0,8 -8,0 0,-8z M26,234l8,0 0,8 -8,0 0,-8z M34,234l8,0 0,8 -8,0 0,-8z M50,234l8,0 0,8 -8,0 0,-8z M66,234l8,0 0,8 -8,0 0,-8z M90,234l8,0 0,8 -8,0 0,-8z M122,234l8,0 0,8 -8,0 0,-8z M138,234l8,0 0,8 -8,0 0,-8z M154,234l8,0 0,8 -8,0 0,-8z M162,234l8,0 0,8 -8,0 0,-8z M170,234l8,0 0,8 -8,0 0,-8z M186,234l8,0 0,8 -8,0 0,-8z M210,234l8,0 0,8 -8,0 0,-8z M226,234l8,0 0,8 -8,0 0,-8z M234,234l8,0 0,8 -8,0 0,-8z M250,234l8,0 0,8 -8,0 0,-8z M2,242l8,0 0,8 -8,0 0,-8z M18,242l8,0 0,8 -8,0 0,-8z M26,242l8,0 0,8 -8,0 0,-8z M34,242l8,0 0,8 -8,0 0,-8z M50,242l8,0 0,8 -8,0 0,-8z M74,242l8,0 0,8 -8,0 0,-8z M90,242l8,0 0,8 -8,0 0,-8z M114,242l8,0 0,8 -8,0 0,-8z M138,242l8,0 0,8 -8,0 0,-8z M170,242l8,0 0,8 -8,0 0,-8z M226,242l8,0 0,8 -8,0 0,-8z M234,242l8,0 0,8 -8,0 0,-8z M242,242l8,0 0,8 -8,0 0,-8z M258,242l8,0 0,8 -8,0 0,-8z M2,250l8,0 0,8 -8,0 0,-8z M50,250l8,0 0,8 -8,0 0,-8z M74,250l8,0 0,8 -8,0 0,-8z M82,250l8,0 0,8 -8,0 0,-8z M90,250l8,0 0,8 -8,0 0,-8z M106,250l8,0 0,8 -8,0 0,-8z M114,250l8,0 0,8 -8,0 0,-8z M122,250l8,0 0,8 -8,0 0,-8z M130,250l8,0 0,8 -8,0 0,-8z M138,250l8,0 0,8 -8,0 0,-8z M146,250l8,0 0,8 -8,0 0,-8z M170,250l8,0 0,8 -8,0 0,-8z M186,250l8,0 0,8 -8,0 0,-8z M194,250l8,0 0,8 -8,0 0,-8z M2,258l8,0 0,8 -8,0 0,-8z M10,258l8,0 0,8 -8,0 0,-8z M18,258l8,0 0,8 -8,0 0,-8z M26,258l8,0 0,8 -8,0 0,-8z M34,258l8,0 0,8 -8,0 0,-8z M42,258l8,0 0,8 -8,0 0,-8z M50,258l8,0 0,8 -8,0 0,-8z M66,258l8,0 0,8 -8,0 0,-8z M82,258l8,0 0,8 -8,0 0,-8z M90,258l8,0 0,8 -8,0 0,-8z M106,258l8,0 0,8 -8,0 0,-8z M114,258l8,0 0,8 -8,0 0,-8z M130,258l8,0 0,8 -8,0 0,-8z M146,258l8,0 0,8 -8,0 0,-8z M170,258l8,0 0,8 -8,0 0,-8z M194,258l8,0 0,8 -8,0 0,-8z M202,258l8,0 0,8 -8,0 0,-8z M226,258l8,0 0,8 -8,0 0,-8z M234,258l8,0 0,8 -8,0 0,-8z M250,258l8,0 0,8 -8,0 0,-8z " stroke="transparent" fill="#0e1a24"/></svg></div>
+      <div class="txt"><p style="margin:0 0 8px;color:var(--muted)">QR-Code mit der Handy-Kamera scannen oder den Link eintippen:</p><div class="big">dizhyzh.github.io/<wbr>monitor-ruecknahme</div></div>
+    </div>
+  </section>
+
+  <section id="android">
+    <h2><span class="ic">2</span>Android (Samsung, Pixel …)</h2>
+    <ol class="steps">
+      <li><span>Link in <b>Chrome</b> öffnen. Öffnet er sich in Samsung Internet: oben rechts <span class="ui">⋮</span> → <span class="ui">In Chrome öffnen</span> oder den Link in Chrome einfügen.</span></li>
+      <li><span>Oben rechts auf <span class="ui">⋮</span> (drei Punkte) tippen.</span></li>
+      <li><span><span class="ui">App installieren</span> wählen (oder <span class="ui">Zum Startbildschirm hinzufügen</span>), dann <span class="ui">Installieren</span>.</span></li>
+      <li><span>Fertig: Das blaue Barcode-Icon <span class="icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3M8 8v8M11 8v8M14 8v8M17 8v8"/></svg></span> ist auf dem Startbildschirm.</span></li>
+    </ol>
+  </section>
+
+  <section id="iphone">
+    <h2><span class="ic">3</span>iPhone</h2>
+    <ol class="steps">
+      <li><span>Link in <b>Safari</b> öffnen (nicht Chrome oder eine Chat-App).</span></li>
+      <li><span>Unten auf <span class="ui">Teilen</span> tippen (Quadrat mit Pfeil nach oben).</span></li>
+      <li><span>Runterscrollen und <span class="ui">Zum Home-Bildschirm</span> wählen, dann <span class="ui">Hinzufügen</span>.</span></li>
+    </ol>
+  </section>
+
+  <section id="pc">
+    <h2><span class="ic">4</span>Laptop / PC</h2>
+    <ol class="steps">
+      <li><span>Link in <b>Chrome</b> oder <b>Edge</b> öffnen.</span></li>
+      <li><span>In der Adressleiste rechts auf das Symbol <span class="ui">Installieren</span> klicken (Bildschirm mit Pfeil), oder über das Menü: <span class="ui">⋮ → Streamen, speichern und teilen → Seite als App installieren</span>.</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="ic">5</span>Erster Start</h2>
+    <ol class="steps">
+      <li><span>App einmal <b>mit Internet</b> öffnen. Danach geht sie auch im Flugmodus.</span></li>
+      <li><span>Im Team: Rollout-Titel und PIN vom Leader eingeben, dazu deinen Namen. Allein: <span class="ui">Ohne Team weiter</span>.</span></li>
+      <li><span>Beim ersten Scan nach der <b>Kamera-Erlaubnis</b> fragt die App, dann <span class="ui">Zulassen</span>.</span></li>
+    </ol>
+    <div class="box tip"><b>Updates</b> kommen automatisch. Fehlt etwas Neues, die App ganz schliessen und neu öffnen.</div>
+    <p style="margin:12px 0 0"><a class="back" href="anleitung.html" style="display:inline-block">Weiter zur Bedienungsanleitung</a></p>
+  </section>
+
+  <footer>Entwickelt von <b>Marco van der Ploeg</b> · dplan IT Services</footer>
+</div>
+</body></html>
