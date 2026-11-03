@@ -802,7 +802,7 @@ async function openForm(id) {
   $("fDatum").value = j ? j.datum : ""; $("fDatum").min = j ? "" : today(); $("fTausch").value = j ? (j.tausch || "1:1") : "1:1";
   { const r = j ? (j.loc_req || {}) : { etage: true, raum: true, buero: true, place: false }; document.querySelectorAll("#fLocReq input").forEach(x => x.checked = !!r[x.dataset.k]); }
   $("fVon").value = j ? j.zeit_von : ""; $("fBis").value = j ? j.zeit_bis : ""; $("fNotes").value = j ? (j.notes || "") : "";
-  fSites = j ? j.sites.map(s => ({ ...s, soll: { ...s.soll } })) : [blankSite()];
+  fSites = j ? j.sites.map(s => ({ ...s, soll: JSON.parse(JSON.stringify(s.soll || {})), _open: j.sites.length === 1 })) : [blankSite()];
   renderSites(); renderFormMat(j); updCode();
   document.querySelectorAll("#jobForm .invalid").forEach(x => x.classList.remove("invalid"));
   const sel = $("fLead"); sel.innerHTML = ""; sel.append(h("option", { value: "" }, "Lade Kollegen …"));
@@ -812,13 +812,44 @@ async function openForm(id) {
   sel.value = j ? (j.lead || "") : "";
   if (!users.length) sel.append(h("option", { value: "", disabled: true }, "Keine Kollegen geladen. Internet?"));
 }
-const blankSite = () => ({ id: uuid(), gebaeude: "", strasse: "", plz: "", ort: "", kontakt: "", telefon: "", zutritt: "", soll: {} });
+const blankSite = () => ({ id: uuid(), gebaeude: "", strasse: "", plz: "", ort: "", kontakt: "", telefon: "", zutritt: "", soll: {}, _open: true });
+// Pflichtfelder eines Standorts prüfen → Liste der fehlenden Angaben (mit Feld-Schlüssel)
+function siteMissing(s) {
+  const m = [];
+  [["strasse", "Strasse"], ["plz", "PLZ"], ["ort", "Ort"], ["kontakt", "Ansprechperson"], ["telefon", "Telefon"]].forEach(([k, l]) => { if (!(s[k] || "").trim()) m.push([k, l]); });
+  if (s.plz && s.plz.trim() && !/^\d{4,5}$/.test(s.plz.trim())) m.push(["plz", "PLZ ungültig"]);
+  if (s.telefon && s.telefon.trim() && s.telefon.replace(/\D/g, "").length < 9) m.push(["telefon", "Telefonnummer zu kurz"]);
+  const so = s.soll || {}; if (![...Object.values(so.ab || {}), ...Object.values(so.auf || {})].some(v => v > 0)) m.push(["soll", "Soll: mindestens ein Gerät"]);
+  return m;
+}
+function markSite(i, miss) { miss.forEach(([k]) => k === "soll" ? document.querySelectorAll('[data-soll="' + i + '"]').forEach(x => x.classList.add("invalid")) : $("s" + i + k) && $("s" + i + k).classList.add("invalid")); }
+function openSite(i) { fSites.forEach((x, k) => x._open = k === i); renderSites(); const c = $("fSites").children[i]; c && c.scrollIntoView({ behavior: "smooth", block: "start" }); }
 function setArt(a) { fArt = a; document.querySelectorAll("#fArt button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === a)); $("fAddSite").hidden = a !== "tour"; if (a === "rollout" && fSites.length > 1) { fSites = fSites.slice(0, 1); renderSites(); } }
 document.querySelectorAll("#fArt button").forEach(b => b.onclick = () => { if (b.dataset.v === "rollout" && fSites.length > 1) return ask("Auf Rollout umstellen?", "Ein Rollout hat nur einen Standort. Die Standorte 2–" + fSites.length + " werden entfernt.", [{ label: "Abbrechen" }, { label: "Umstellen", cls: "danger", fn: () => setArt("rollout") }]); setArt(b.dataset.v); });
-$("fAddSite").onclick = () => { fSites.push(blankSite()); renderSites(); const cards = $("fSites").querySelectorAll(".sitecard"); cards[cards.length - 1].scrollIntoView({ behavior: "smooth", block: "start" }); };
+$("fAddSite").onclick = () => {
+  const oi = fSites.findIndex(x => x._open);
+  if (oi >= 0) { const miss = siteMissing(fSites[oi]); if (miss.length) { markSite(oi, miss); $("fErr").innerHTML = ""; $("fErr").append("Standort " + (oi + 1) + " ist noch nicht vollständig:", h("ul", null, miss.map(([, l]) => h("li", null, l)))); beepBad(); const el = $("fSites").children[oi].querySelector(".invalid"); el && el.scrollIntoView({ behavior: "smooth", block: "center" }); return; } }
+  $("fErr").textContent = "";
+  fSites.forEach(x => x._open = false); fSites.push(blankSite()); renderSites(); updCode();
+  const cards = $("fSites").children; cards[cards.length - 1].scrollIntoView({ behavior: "smooth", block: "start" }); setTimeout(() => { const f = $("s" + (fSites.length - 1) + "gebaeude"); f && f.focus({ preventScroll: true }); }, 350);
+};
+function siteCardMini(s, i) {
+  const miss = siteMissing(s);
+  const soll = DIRS.map(([d, l]) => { const x = Object.entries((s.soll || {})[d] || {}).filter(([, v]) => v > 0).map(([k, v]) => v + " " + k).join(", "); return x ? l + ": " + x : ""; }).filter(Boolean).join(" · ");
+  return h("section", { class: "card sitemini" + (miss.length ? " bad" : "") },
+    h("div", { class: "sh" }, h("span", { class: "no" }, String(i + 1)),
+      h("div", { class: "sa" }, h("b", null, s.gebaeude || addr(s) || "Neuer Standort"), s.gebaeude ? h("span", null, addr(s)) : null),
+      h("div", { class: "minibtns" }, h("button", { type: "button", class: "btn", onclick: () => openSite(i) }, "Bearbeiten"),
+        fSites.length > 1 ? h("button", { type: "button", class: "btn link", "aria-label": "Standort " + (i + 1) + " entfernen", onclick: () => ask("Standort " + (i + 1) + " entfernen?", siteLabel(s) || "Leerer Standort", [{ label: "Abbrechen" }, { label: "Entfernen", cls: "danger", fn: () => { fSites.splice(i, 1); if (!fSites.some(x => x._open) && fSites.length === 1) fSites[0]._open = true; renderSites(); updCode(); } }]) }, "✕") : null)),
+    h("div", { class: "line" }, s.kontakt ? h("span", null, "👤 " + s.kontakt) : null, s.telefon ? h("span", null, "📞 " + s.telefon) : null, s.zutritt ? h("span", null, "🔑 " + s.zutritt) : null),
+    soll ? h("div", { class: "hint", style: "margin:0" }, soll) : null,
+    miss.length ? h("div", { class: "err", style: "min-height:0" }, "Fehlt noch: " + miss.map(([, l]) => l).join(", ")) : null);
+}
 function renderSites() {
   const box = $("fSites"); box.innerHTML = "";
+  if (fArt === "rollout" && fSites[0]) fSites[0]._open = true;
   fSites.forEach((s, i) => {
+    if (!s._open) { box.append(siteCardMini(s, i)); return; }
     const inp = (k, label, req, ph, attrs) => h("div", { class: "fld" }, h("label", { for: "s" + i + k }, label, req ? h("span", { class: "req" }, " ✱") : null),
       h("input", { id: "s" + i + k, type: "text", value: s[k] || "", placeholder: ph || "", "data-site": i, "data-k": k, oninput: e => { s[k] = e.target.value; e.target.classList.remove("invalid"); updCode(); }, ...(attrs || {}) }));
     if (!s.soll.ab && !s.soll.auf) s.soll = Object.keys(s.soll || {}).length ? { ab: { ...s.soll }, auf: {} } : { ab: {}, auf: {} };
@@ -827,7 +858,9 @@ function renderSites() {
     const soll = h("table", { class: "sollt" }, h("thead", null, h("tr", null, h("th", null, "Gerätetyp"), h("th", { class: "ab" }, "Abbau (alt)"), h("th", { class: "auf" }, "Aufbau (neu)"))),
       h("tbody", null, TYPE_NAMES.map(t => h("tr", null, h("td", null, t), cell("ab", t), cell("auf", t)))));
     box.append(h("section", { class: "card sitecard" },
-      h("div", { class: "sch" }, h("h2", null, fArt === "tour" ? "Standort " + (i + 1) : "Standort"), fSites.length > 1 ? h("button", { type: "button", class: "btn link", onclick: () => { fSites.splice(i, 1); renderSites(); updCode(); } }, "Entfernen") : null),
+      h("div", { class: "sch" }, h("h2", null, fArt === "tour" ? "Standort " + (i + 1) : "Standort"),
+        h("div", { class: "minibtns" }, fSites.length > 1 ? h("button", { type: "button", class: "btn", onclick: () => { const miss = siteMissing(s); if (miss.length) { markSite(i, miss); toast("Fehlt noch: " + miss.map(([, l]) => l).join(", ")); beepBad(); return; } s._open = false; renderSites(); } }, "Fertig ✓") : null,
+          fSites.length > 1 ? h("button", { type: "button", class: "btn link", onclick: () => { fSites.splice(i, 1); renderSites(); updCode(); } }, "Entfernen") : null)),
       inp("gebaeude", "Gebäude / Bezeichnung", false, "z. B. HWLC"),
       h("div", { class: "row2" }, inp("strasse", "Strasse und Nr.", true, "Hardturmstrasse 1"), h("div", { class: "row2" }, inp("plz", "PLZ", true, "8005", { inputmode: "numeric" }), inp("ort", "Ort", true, "Zürich"))),
       h("div", { class: "row2" }, inp("kontakt", "Ansprechperson vor Ort", true, "Vorname Nachname"), inp("telefon", "Telefon", true, "044 123 45 67", { type: "tel", inputmode: "tel" })),
@@ -860,12 +893,13 @@ $("jobForm").addEventListener("submit", async e => {
   const d = $("fDatum").value;
   if (d && !formJob && d < today()) { bad($("fDatum")); miss.push("Datum liegt in der Vergangenheit"); }
   if ($("fVon").value && $("fBis").value && $("fBis").value <= $("fVon").value) { bad($("fBis")); miss.push("«Bis» muss nach «Von» sein"); }
+  const firstBad = fSites.findIndex(x => siteMissing(x).length);
+  if (firstBad >= 0 && !fSites[firstBad]._open) { fSites.forEach((x, k) => x._open = k === firstBad); renderSites(); }
   fSites.forEach((s, i) => {
     const pre = fSites.length > 1 ? "Standort " + (i + 1) + ": " : "";
-    [["strasse", "Strasse"], ["plz", "PLZ"], ["ort", "Ort"], ["kontakt", "Ansprechperson"], ["telefon", "Telefon"]].forEach(([k, l]) => { if (!(s[k] || "").trim()) { bad($("s" + i + k)); miss.push(pre + l); } });
-    if (s.plz && !/^\d{4,5}$/.test(s.plz.trim())) { bad($("s" + i + "plz")); miss.push(pre + "PLZ ungültig"); }
-    if (s.telefon && s.telefon.replace(/\D/g, "").length < 9) { bad($("s" + i + "telefon")); miss.push(pre + "Telefonnummer zu kurz"); }
-    if (![...Object.values(s.soll.ab || {}), ...Object.values(s.soll.auf || {})].some(v => v > 0)) { document.querySelectorAll('[data-soll="' + i + '"]').forEach(bad); miss.push(pre + "Soll: mindestens ein Gerät"); }
+    const ms = siteMissing(s); if (!ms.length) return;
+    if (s._open) markSite(i, ms);
+    ms.forEach(([, l]) => miss.push(pre + l));
   });
   if (miss.length) {
     $("fErr").innerHTML = ""; $("fErr").append("Noch nicht vollständig:", h("ul", null, miss.map(m => h("li", null, m))));

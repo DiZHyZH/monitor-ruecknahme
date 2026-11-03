@@ -263,7 +263,18 @@ input.big{font-size:20px;padding:14px 16px}
 
 /* form */
 .codeprev{font-size:13.5px;color:var(--muted)} .codeprev b{font-family:var(--mono);color:var(--fg)}
-.sitecard .sch{display:flex;justify-content:space-between;align-items:center}
+.sitecard .sch{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.minibtns{display:flex;gap:4px;align-items:center;flex:none}
+.minibtns .btn{min-height:38px;font-size:14px}
+.sitemini{gap:8px;padding:12px 14px;border-left:4px solid var(--ok)}
+.sitemini.bad{border-left-color:var(--bad)}
+.sitemini .sh{display:flex;gap:10px;align-items:center}
+.sitemini .no{flex:none;width:30px;height:30px;border-radius:50%;background:var(--accent-soft);color:var(--accent-strong);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
+.sitemini .sa{flex:1;min-width:0}
+.sitemini .sa b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sitemini .sa span{color:var(--muted);font-size:13.5px}
+.sitemini .line{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13.5px}
+#fSites{display:flex;flex-direction:column;gap:10px}
 .sollgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
 .sollgrid .fld label{text-transform:none;letter-spacing:0;font-size:13px}
 .formmat{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px 14px}
