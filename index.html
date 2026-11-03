@@ -192,6 +192,17 @@ li .del.arm{color:var(--bad);background:var(--bad-soft);font-weight:700}
 .qrbox{background:#fff;border-radius:14px;padding:12px;display:flex;justify-content:center}
 .qrbox img{width:100%;max-width:320px;height:auto;image-rendering:pixelated}
 .dlgbox .code{font-family:var(--f-mono);font-size:13px;color:var(--muted);text-align:center;overflow-wrap:anywhere}
+.live{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;background:var(--muted);vertical-align:1px}
+.live.on{background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
+.live.wait{background:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)}
+.syncline{font-size:12.5px;color:var(--muted);padding:0 4px;margin-top:-6px}
+.login{position:fixed;inset:0;z-index:55;background:var(--bg);overflow-y:auto;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.login .wrap{padding-block:28px 40px;gap:18px}
+.login .brand{display:flex;align-items:center;gap:12px}
+.login .brand img{height:34px;width:auto;background:#fff;border-radius:8px;padding:4px 6px;box-shadow:0 0 0 1px var(--line)}
+.login h2{margin:0;font-size:26px;font-weight:800;letter-spacing:-.02em}
+.login p{margin:0;color:var(--muted);font-size:15px}
+.login .err{color:var(--bad);font-size:14px;min-height:1.3em}
 </style>
 </head><body>
 
@@ -200,7 +211,8 @@ li .del.arm{color:var(--bad);background:var(--bad-soft);font-weight:700}
     <span class="logo"><img src="dplan-logo.png" alt="dplan IT Services" width="76" height="30"></span><h1>Monitor-Rücknahme</h1>
     <div class="count" aria-live="polite"><b id="cnt">0</b> <span style="font-size:13px;color:var(--muted)">erfasst</span></div>
   </header>
-  <div class="listbar"><button type="button" class="lname" id="lname" title="Liste umbenennen">–</button><button type="button" class="btn" id="openHist">Verlauf</button></div>
+  <div class="listbar"><button type="button" class="lname" id="lname" title="Liste">–</button><button type="button" class="btn" id="teamBtn">Team-Login</button><button type="button" class="btn" id="openHist">Verlauf</button></div>
+  <div id="syncline" class="syncline" hidden></div>
   <div id="notice" class="notice" hidden></div>
 
   <div class="mode" role="group" aria-label="Modus">
@@ -290,6 +302,19 @@ li .del.arm{color:var(--bad);background:var(--bad-soft);font-weight:700}
 </div></div>
 <input id="impFile" class="cam" type="file" accept=".json,application/json,text/plain" multiple>
 <input id="impQR" class="cam" type="file" accept="image/*" multiple>
+<div id="login" class="login" hidden><div class="wrap">
+  <div class="brand"><img src="dplan-logo.png" alt="dplan IT Services"></div>
+  <div><h2>Team-Rollout</h2><p>Alle mit dem gleichen Rollout-Titel und PIN sehen live die gleiche Liste, egal von welchem Gerät.</p></div>
+  <form class="card" id="loginForm" autocomplete="off">
+    <div class="fld"><label class="lb" for="lgCode">Rollout-Titel</label><input id="lgCode" class="code" type="text" autocapitalize="characters" spellcheck="false" placeholder="z. B. HWLC_VBZ_2026_11_03"></div>
+    <div class="fld"><label class="lb" for="lgPin">PIN</label><input id="lgPin" class="code" type="text" inputmode="numeric" autocomplete="off" placeholder="mind. 4 Zeichen, vom Leader"></div>
+    <div class="fld"><label class="lb" for="lgName">Dein Name</label><input id="lgName" type="text" autocomplete="name" placeholder="z. B. Marco"></div>
+    <div class="err" id="lgErr" aria-live="polite"></div>
+    <button class="btn dark wide" type="submit" id="lgGo">Beitreten</button>
+    <p class="hint">Gibt es den Titel noch nicht, wird der Rollout mit diesem PIN neu angelegt. Den PIN dann im Team teilen.</p>
+  </form>
+  <button class="btn wide" type="button" id="lgSolo">Ohne Team weiter (nur auf diesem Handy)</button>
+</div></div>
 <div id="toast" class="toast" hidden><span id="toastT"></span><button id="undo" type="button" hidden>Rückgängig</button></div>
 
 <script>//---------------------------------------------------------------------
@@ -2631,10 +2656,10 @@ function render(){
   });
 }
 async function put(rec){
-  {items.push(rec);persist();render()}
+  {items.push(rec);persist();render();if(teamActive())enqueue({op:"add",item:rec})}
 }
 async function remove(id,silent){
-  {items=items.filter(x=>x.id!==id);persist();render();if(!silent)toast("Gelöscht")}
+  {items=items.filter(x=>x.id!==id);persist();render();if(teamActive())enqueue({op:"del",id});if(!silent)toast("Gelöscht")}
 }
 const isDup=a=>items.some(x=>norm(x.asset)===norm(a));
 async function saveRec(rec,el){
@@ -2802,7 +2827,7 @@ const fmtDay=ts=>new Date(ts).toLocaleString("de-CH",{day:"2-digit",month:"2-dig
 function persist(){const a=activeList();if(a){a.items=items;a.updated=Date.now()}ls.set(LSL,{lists,activeId})}
 function uniqName(n){if(!lists.some(l=>l.name===n))return n;let i=2;while(lists.some(l=>l.name===n+" ("+i+")"))i++;return n+" ("+i+")"}
 function newList(name){const d=new Date();const l={id:"l"+Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:uniqName(name||("Rücknahme "+d.toLocaleDateString("de-CH"))),created:Date.now(),updated:Date.now(),closed:null,items:[]};lists.push(l);return l}
-function showName(){const a=activeList();$("lname").innerHTML="";$("lname").append(document.createTextNode((a?a.name:"–")+" ✎"))}
+function showName(){const a=activeList();$("lname").innerHTML="";if(teamActive()){const d=document.createElement("span");d.id="live";d.className="live";$("lname").append(d,document.createTextNode(team.code));syncBadge()}else $("lname").append(document.createTextNode((a?a.name:"–")+" ✎"))}
 function openList(id){persist();const l=lists.find(x=>x.id===id);if(!l)return;l.closed=null;activeId=id;items=(l.items||[]).slice();persist();showName();render();checkExt()}
 function startNew(name){persist();const l=newList(name);activeId=l.id;items=[];persist();showName();render();checkExt()}
 
@@ -2818,7 +2843,7 @@ $("dlg").addEventListener("click",e=>{if(e.target.id==="dlg")$("dlg").hidden=tru
 inpEnter($("dlgI"));function inpEnter(i){i.addEventListener("keydown",e=>{if(e.key==="Enter"){const b=$("dlgA").lastElementChild;b&&b.click()}})}
 
 function rename(l){ask("Liste umbenennen","Zum Beispiel Kunde, Gebäude oder Auftrag.",[{label:"Abbrechen"},{label:"Speichern",cls:"dark",fn:v=>{if(!v)return;l.name=v;persist();showName();renderHist()}}],l.name)}
-$("lname").onclick=()=>{const a=activeList();if(a)rename(a)};
+$("lname").onclick=()=>{if(teamActive()){teamMenu();return}const a=activeList();if(a)rename(a)};
 
 $("finish").onclick=()=>{
   const a=activeList();
@@ -2917,7 +2942,7 @@ function mergeIn(data){
   data.items.forEach(it=>{
     const ex=arr.find(x=>norm(x.asset)===norm(it.asset));
     if(ex){dup++;let ch=false;F.forEach(k=>{if(k==="asset"||!it[k])return;if(!ex[k]||(k==="cond"&&ex.cond==="ok"&&it.cond!=="ok")){ex[k]=it[k];ch=true}});if(!ex.by&&it.by){ex.by=it.by;ch=true}if(ch)filled++;return}
-    arr.push({...it,id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,7)});added++;
+    const nit={...it,id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,7)};arr.push(nit);added++;if(team&&l.name===team.code)enqueue({op:"add",item:nit});
   });
   l.updated=Date.now();
   if(l.id!==activeId){l.closed=null;activeId=l.id;items=arr.slice()}
@@ -2946,6 +2971,106 @@ $("impQR").addEventListener("change",async e=>{
   }
   if(rs.length)report(rs);if(bad)toast(bad===1?"QR-Code nicht erkannt. Näher ran, ganz im Bild, Bildschirm hell.":bad+" QR-Codes nicht erkannt");
 });
+
+/* ---------- Team-Rollout live (Supabase) ---------- */
+const SB_URL="https://bxhqgugvihlogirbdrrv.supabase.co", SB_KEY="sb_publishable_sIuUYIqAwoyICZyXy9GhtA_xXPAhW7g";
+let team=ls.get(LS+"-team",null);            // {code,pin,name}
+let queue=ls.get(LS+"-queue",[]);            // pending ops
+let lastSync=ls.get(LS+"-since","1970-01-01T00:00:00Z"), syncOk=0, syncTimer=null, syncing=false;
+const teamActive=()=>!!(team&&activeList()&&activeList().team===team.code);
+async function rpc(fn,body){
+  const r=await fetch(SB_URL+"/rest/v1/rpc/"+fn,{method:"POST",headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const t=await r.text();let j=null;try{j=t?JSON.parse(t):null}catch(e){}
+  if(!r.ok){const m=(j&&(j.message||j.hint))||("HTTP "+r.status);const e=new Error(m);e.status=r.status;throw e}
+  return j;
+}
+function enqueue(op){if(!team)return;op.code=team.code;queue.push(op);ls.set(LS+"-queue",queue);syncBadge();kick()}
+function syncBadge(){
+  const d=$("live");const pend=queue.filter(q=>team&&q.code===team.code).length;
+  const on=Date.now()-syncOk<20000&&navigator.onLine!==false;
+  if(d)d.className="live "+(on&&!pend?"on":pend?"wait":"");
+  const sl=$("syncline");
+  if(teamActive()){sl.hidden=false;sl.textContent=(on?"Live verbunden":"Offline, wird gespeichert und später hochgeladen")+(pend?" · "+pend+" noch nicht hochgeladen":"")+" · angemeldet als "+team.name}
+  else sl.hidden=true;
+  $("teamBtn").textContent=teamActive()?"Team":"Team-Login";
+}
+function kick(){clearTimeout(syncTimer);syncTimer=setTimeout(sync,200)}
+async function sync(){
+  clearTimeout(syncTimer);
+  if(!team||syncing){syncTimer=setTimeout(sync,4000);return}
+  if(document.hidden){syncTimer=setTimeout(sync,8000);return}
+  syncing=true;
+  try{
+    // 1) upload pending
+    while(queue.length){
+      const op=queue[0];
+      if(op.code!==team.code){queue.shift();continue}
+      if(op.op==="add"){const res=await rpc("mr_add",{p_code:team.code,p_pin:team.pin,p:op.item});
+        if(res&&res.status==="dup"&&res.id!==op.item.id){const l=teamList();l.items=(l.items||[]).filter(x=>x.id!==op.item.id);if(l.id===activeId)items=items.filter(x=>x.id!==op.item.id);
+          toast(op.item.asset+" hat "+(res.by||"jemand")+" schon erfasst")}}
+      else if(op.op==="del")await rpc("mr_delete",{p_code:team.code,p_pin:team.pin,p_id:op.id});
+      queue.shift();ls.set(LS+"-queue",queue);
+    }
+    // 2) pull changes
+    const rows=await rpc("mr_list",{p_code:team.code,p_pin:team.pin,p_since:lastSync})||[];
+    if(rows.length){
+      const l=teamList();let arr=l.id===activeId?items:(l.items||[]);
+      rows.forEach(r=>{
+        arr=arr.filter(x=>x.id!==r.id);
+        if(!r.deleted){arr=arr.filter(x=>!(norm(x.asset)===norm(r.asset)&&!queue.some(q=>q.item&&q.item.id===x.id)));
+          const o={id:r.id,asset:r.asset,ts:Number(r.ts)||Date.parse(r.updated_at)};["neu","etage","raum","buero","place","cond","note","by"].forEach(k=>{if(r[k])o[k]=r[k]});arr.push(o)}
+        if(r.updated_at>lastSync)lastSync=r.updated_at;
+      });
+      l.items=arr;if(l.id===activeId)items=arr;ls.set(LS+"-since",lastSync);persist();render();checkExt();
+    }
+    syncOk=Date.now();
+  }catch(e){
+    if(/wrong_pin/.test(e.message)){toast("PIN stimmt nicht mehr. Bitte neu anmelden.");logout(true)}
+  }finally{syncing=false;syncBadge();if(team)syncTimer=setTimeout(sync,queue.length?1500:4000)}
+}
+function teamList(){let l=lists.find(x=>x.team===team.code);if(!l){l=newList(team.code);l.name=team.code;l.team=team.code}return l}
+async function login(code,pin,name){
+  const res=await rpc("mr_join",{p_code:code,p_pin:pin,p_by:name});
+  const changed=!team||team.code!==code;
+  team={code,pin,name};ls.set(LS+"-team",team);ls.set(LS+"-me",name);
+  if(changed){lastSync="1970-01-01T00:00:00Z";ls.set(LS+"-since",lastSync)}
+  persist();const l=teamList();l.closed=null;activeId=l.id;items=(l.items||[]).slice();persist();showName();render();checkExt();
+  syncOk=Date.now();kick();
+  return res;
+}
+function logout(keepList){
+  team=null;ls.set(LS+"-team",null);clearTimeout(syncTimer);
+  const solo=lists.filter(x=>!x.team&&!x.closed).sort((a,b)=>b.updated-a.updated)[0];
+  if(solo){activeId=solo.id;items=(solo.items||[]).slice()}else startNew();
+  persist();showName();render();syncBadge();
+}
+function showLogin(){
+  $("lgCode").value=team?team.code:"";$("lgPin").value="";$("lgName").value=(team&&team.name)||myName();$("lgErr").textContent="";
+  $("login").hidden=false;setTimeout(()=>$(team?"lgPin":"lgCode").focus(),100);
+}
+$("loginForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const code=$("lgCode").value.trim().replace(/\s+/g,"_"),pin=$("lgPin").value.trim(),name=$("lgName").value.trim();
+  if(code.length<4){$("lgErr").textContent="Rollout-Titel fehlt (mind. 4 Zeichen).";return}
+  if(pin.length<4){$("lgErr").textContent="PIN fehlt (mind. 4 Zeichen).";return}
+  if(!name){$("lgErr").textContent="Bitte deinen Namen eingeben.";return}
+  $("lgGo").disabled=true;$("lgErr").textContent="Verbinde …";
+  try{const r=await login(code,pin,name);$("login").hidden=true;ls.set(LS+"-loginseen",1);
+    toast(r==="created"?"Rollout «"+code+"» angelegt. PIN ans Team geben.":"Beigetreten: "+code)}
+  catch(err){$("lgErr").textContent=/wrong_pin/.test(err.message)?"Falscher PIN für diesen Rollout.":/Failed to fetch|NetworkError|Load failed/i.test(err.message)?"Keine Verbindung. Internet prüfen oder ohne Team weiter.":"Anmelden ging nicht: "+err.message}
+  finally{$("lgGo").disabled=false}
+});
+$("lgSolo").onclick=()=>{$("login").hidden=true;ls.set(LS+"-loginseen",1)};
+function teamMenu(){
+  if(!teamActive()){showLogin();return}
+  ask("Team-Rollout «"+team.code+"»","Angemeldet als "+team.name+". "+(queue.length?queue.length+" Einträge warten noch auf Upload. ":"Alles hochgeladen. ")+"Die Liste bleibt auch nach dem Abmelden auf diesem Handy.",
+    [{label:"Abmelden",cls:"danger",fn:()=>{if(queue.length){ask("Wirklich abmelden?",queue.length+" Einträge sind noch nicht hochgeladen und würden fehlen.",[{label:"Zurück"},{label:"Trotzdem abmelden",cls:"danger",fn:()=>logout()}])}else logout()}},
+     {label:"Anderer Rollout",fn:showLogin},{label:"OK",cls:"dark"}]);
+}
+$("teamBtn").onclick=teamMenu;
+window.addEventListener("online",kick);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&team)kick()});
+setInterval(syncBadge,5000);
 (function boot(){
   {const l=ls.get(LS+"-loc",{})||{};$("eFloor").value=l.etage||"";$("eRoom").value=l.raum||"";$("eOffice").value=l.buero||""}
   setMode(ls.get(LS+"-mode","quick"));
@@ -2955,6 +3080,8 @@ $("impQR").addEventListener("change",async e=>{
   let a=activeList();
   if(!a||a.closed){const open=lists.filter(x=>!x.closed).sort((x,y)=>y.updated-x.updated)[0];if(open)a=open;else a=newList();activeId=a.id}
   items=(a.items||[]).slice();persist();showName();render();loadDraft();checkExt();
+  if(team){const tl=lists.find(x=>x.team===team.code);if(tl&&tl.id!==activeId&&!activeList().items.length){activeId=tl.id;items=(tl.items||[]).slice()}showName();kick()}
+  else if(!ls.get(LS+"-loginseen",0))showLogin();
   if(!ls.ok()){$("notice").hidden=false;$("notice").textContent="Dieser Browser speichert nichts. Datei in Chrome öffnen, nicht in einer Vorschau."}
 })();
 </script>
