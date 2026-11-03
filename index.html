@@ -110,9 +110,8 @@ li .del.arm{color:var(--bad);border-color:var(--bad)}
 <div class="wrap">
   <header>
     <h1>Monitor-Rücknahme</h1>
-    <div class="count" aria-live="polite"><b id="cnt">0</b> / <input id="target" type="text" inputmode="numeric" value="60" aria-label="Ziel-Anzahl"></div>
+    <div class="count" aria-live="polite"><b id="cnt">0</b> <span style="font-size:13px;color:var(--muted)">erfasst</span></div>
   </header>
-  <div class="bar"><i id="barfill"></i></div>
   <div id="notice" class="notice" hidden></div>
 
   <div class="mode" role="group" aria-label="Modus">
@@ -210,8 +209,6 @@ $("mQuick").onclick=()=>setMode("quick");$("mExt").onclick=()=>setMode("ext");
 function render(){
   const list=$("list"), s=items.slice().sort((a,b)=>b.ts-a.ts);
   $("cnt").textContent=items.length;
-  const t=parseInt($("target").value)||0;
-  $("barfill").style.width=t?Math.min(100,items.length/t*100)+"%":"0";
   if(!s.length){list.innerHTML='<li class="empty">Noch nichts erfasst. Erstes Asset-Label scannen, die Liste füllt sich hier.</li>';return}
   list.innerHTML="";
   s.forEach((it,i)=>{
@@ -248,7 +245,7 @@ async function saveAsset(raw){
 }
 $("undo").onclick=()=>{if(lastSaved){remove(lastSaved,true);lastSaved=null;$("toast").hidden=true;toast("Rückgängig gemacht")}};
 $("f").addEventListener("submit",async e=>{e.preventDefault();if(!$("asset").value.trim()){$("asset").focus();return}if(await saveAsset($("asset").value))$("asset").value=""});
-$("target").addEventListener("input",()=>{ls.set(LS+"-target",$("target").value);render()});
+
 
 /* ---------- extended form ---------- */
 function setCond(v){cond=v;document.querySelectorAll("#cond button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===v))}
@@ -390,7 +387,6 @@ $("gal").addEventListener("change",async e=>{
 $("galOld").addEventListener("change",e=>scanPhoto(e.target,$("escan"),$("epicks"),c=>{$("eOld").value=clean(c);checkExt();state(isDup(c)?c+" ist schon in der Liste.":"Alter Monitor erkannt."+($("eNew").value?"":" Jetzt den neuen scannen."),isDup(c)?"warn":"ok",$("escan"))}));
 $("galNew").addEventListener("change",e=>scanPhoto(e.target,$("escan"),$("epicks"),c=>{$("eNew").value=clean(c);checkExt();state("Neuer Monitor erkannt."+($("eOld").value?" Ort prüfen, dann speichern.":" Jetzt den alten scannen."),"ok",$("escan"))}));
 (function boot(){
-  const t=ls.get(LS+"-target",null);if(t)$("target").value=t;
   {const l=ls.get(LS+"-loc",{})||{};$("eFloor").value=l.etage||"";$("eRoom").value=l.raum||"";$("eOffice").value=l.buero||""}
   setMode(ls.get(LS+"-mode","quick"));
   items=ls.get(LS,[]);render();
