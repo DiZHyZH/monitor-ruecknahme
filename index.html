@@ -85,7 +85,11 @@
   </div>
   <div class="scangrid">
     <div class="col">
-      <section class="card scancard">
+      <section class="card scancard dir-ab" id="scanCard">
+        <div class="dirseg" id="dirSeg" role="group" aria-label="Richtung">
+          <button type="button" data-v="ab" aria-pressed="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 4v14M6 12l6 6 6-6"/></svg>Abbau<small id="dirAbN"></small></button>
+          <button type="button" data-v="auf" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 20V6M6 12l6-6 6 6"/></svg>Aufbau<small id="dirAufN"></small></button>
+        </div>
         <form id="scanForm" class="scanrow" autocomplete="off">
           <input id="scanIn" class="mono big" type="text" autocapitalize="characters" spellcheck="false" placeholder="Asset-ID scannen oder tippen" aria-label="Asset-ID">
           <button class="btn primary" type="submit">Erfassen</button>
@@ -105,7 +109,7 @@
           </div>
           <div class="row2">
             <div class="fld"><label for="dPlatz">Arbeitsplatz</label><input id="dPlatz" type="text" placeholder="14"></div>
-            <div class="fld"><label for="dNeu">Ersetzt durch</label><input id="dNeu" class="mono" type="text" placeholder="neue Asset-ID" autocapitalize="characters" spellcheck="false"></div>
+            <div class="fld"><label for="dNeu" id="dNeuL">Ersetzt durch</label><input id="dNeu" class="mono" type="text" placeholder="neue Asset-ID" autocapitalize="characters" spellcheck="false"></div>
           </div>
           <div class="fld"><label>Zustand</label><div class="chips" id="dCond"><button type="button" data-v="ok" aria-pressed="true">OK</button><button type="button" data-v="gebraucht" aria-pressed="false">Gebrauchsspuren</button><button type="button" data-v="defekt" aria-pressed="false">Defekt</button></div></div>
           <div class="fld"><label for="dNote">Notiz</label><input id="dNote" type="text" placeholder="z. B. ohne Fuss"></div>
@@ -124,7 +128,7 @@
       <section class="card listcard">
         <div class="listhead"><h2>Erfasst <small id="listCount"></small></h2>
           <div class="seg2 small" role="group"><button type="button" id="lsSite" aria-pressed="true">Dieser Standort</button><button type="button" id="lsAll" aria-pressed="false">Alle</button></div></div>
-        <div class="tablewrap"><table class="tbl"><thead><tr><th>#</th><th>Asset-ID</th><th>Typ</th><th class="hide-s">Ort</th><th class="hide-s">Von</th><th></th></tr></thead><tbody id="scanRows"></tbody></table></div>
+        <div class="tablewrap"><table class="tbl"><thead><tr><th>#</th><th>Asset-ID</th><th>Typ</th><th></th><th class="hide-s">Ort</th><th class="hide-s">Von</th><th></th></tr></thead><tbody id="scanRows"></tbody></table></div>
         <div id="scanEmpty" class="empty">Noch nichts erfasst an diesem Standort.</div>
       </section>
     </div>

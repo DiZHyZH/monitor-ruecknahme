@@ -83,7 +83,13 @@ create table if not exists public.invites (
 alter table public.scans alter column rollout drop not null;
 alter table public.scans add column if not exists job_id  uuid references public.jobs(id) on delete cascade;
 alter table public.scans add column if not exists site_id uuid;
-create unique index if not exists scans_job_asset on public.scans (job_id, asset_norm) where not deleted and job_id is not null;
+alter table public.scans add column if not exists dir text not null default 'ab';
+do $$ begin
+  alter table public.scans add constraint scans_dir_chk check (dir in ('ab','auf'));
+exception when duplicate_object then null; end $$;
+drop index if exists public.scans_job_asset;
+-- gleiche Asset-ID darf im Auftrag einmal im Abbau und einmal im Aufbau vorkommen
+create unique index if not exists scans_job_asset_dir on public.scans (job_id, asset_norm, dir) where not deleted and job_id is not null;
 create index if not exists scans_job_updated on public.scans (job_id, updated_at);
 
 create table if not exists public.material_used (
@@ -200,7 +206,10 @@ begin
     i := i + 1;
     if trim(coalesce(s->>'strasse','')) = '' or trim(coalesce(s->>'plz','')) = '' or trim(coalesce(s->>'ort','')) = '' then raise exception 'missing:adresse:%', i; end if;
     if trim(coalesce(s->>'kontakt','')) = '' or trim(coalesce(s->>'telefon','')) = '' then raise exception 'missing:kontakt:%', i; end if;
-    if not exists (select 1 from jsonb_each_text(coalesce(s->'soll','{}'::jsonb)) e where e.value ~ '^\d+$' and e.value::int > 0) then raise exception 'missing:soll:%', i; end if;
+    -- Soll: {"ab":{Typ:n}, "auf":{Typ:n}}; mindestens eine Zahl > 0
+    if not exists (
+      select 1 from jsonb_each(coalesce(s->'soll','{}'::jsonb)) d, jsonb_each_text(case when jsonb_typeof(d.value) = 'object' then d.value else jsonb_build_object(d.key, d.value) end) e
+      where e.value ~ '^\d+$' and e.value::int > 0) then raise exception 'missing:soll:%', i; end if;
   end loop;
 
   first_label := coalesce(nullif(trim(v_sites->0->>'gebaeude'),''), trim(v_sites->0->>'ort'));
@@ -308,11 +317,13 @@ end $$;
 create or replace function public.scan_add(p_job uuid, p jsonb) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
 declare ex public.scans; n text := upper(regexp_replace(coalesce(p->>'asset',''), '\s', '', 'g')); v_site uuid := nullif(p->>'site_id','')::uuid;
+  v_dir text := coalesce(nullif(p->>'dir',''), 'ab');
 begin
   perform public.mr_need_job(p_job, true);
   if n = '' then raise exception 'no_asset'; end if;
+  if v_dir not in ('ab','auf') then raise exception 'bad_dir'; end if;
   if v_site is null or not exists (select 1 from public.sites where id = v_site and job_id = p_job) then raise exception 'bad_site'; end if;
-  select * into ex from public.scans where job_id = p_job and asset_norm = n and not deleted;
+  select * into ex from public.scans where job_id = p_job and asset_norm = n and dir = v_dir and not deleted;
   if found then
     update public.scans set
       neu   = coalesce(nullif(neu,''),   nullif(p->>'neu','')),
@@ -329,8 +340,8 @@ begin
   if exists (select 1 from public.scans where id = p->>'id') then
     return jsonb_build_object('status','added','id',p->>'id');
   end if;
-  insert into public.scans(id, job_id, site_id, asset, neu, etage, raum, buero, place, cond, note, "by", user_id, ts)
-  values (p->>'id', p_job, v_site, p->>'asset', p->>'neu', p->>'etage', p->>'raum', p->>'buero', p->>'place',
+  insert into public.scans(id, job_id, site_id, dir, asset, neu, etage, raum, buero, place, cond, note, "by", user_id, ts)
+  values (p->>'id', p_job, v_site, v_dir, p->>'asset', p->>'neu', p->>'etage', p->>'raum', p->>'buero', p->>'place',
           coalesce(p->>'cond','ok'), p->>'note', public.mr_me(), auth.uid(), (p->>'ts')::bigint);
   update public.jobs set status = 'aktiv', updated_at = now() where id = p_job and status = 'geplant';
   return jsonb_build_object('status','added','id',p->>'id');
