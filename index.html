@@ -220,6 +220,18 @@ li .del.arm{color:var(--bad);background:var(--bad-soft);font-weight:700}
 .ranklist li:first-child .bar{background:linear-gradient(90deg,#f2b705,#e08e0b)}
 .ranklist .num{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;min-width:2ch;text-align:right}
 .ranklist .num small{display:block;font-size:11px;font-weight:600;color:var(--muted);text-align:right}
+.tag.dev{color:var(--accent-strong);background:var(--accent-soft)}
+.tag.unk{color:var(--bad);background:var(--bad-soft)}
+.tsum{display:flex;flex-wrap:wrap;gap:6px}
+.tsum span{font-size:12px;font-weight:600;color:var(--accent-strong);background:var(--accent-soft);border-radius:999px;padding:3px 10px;font-variant-numeric:tabular-nums}
+.tsum span b{font-weight:800;margin-right:4px}
+.tsum span.unk{color:var(--bad);background:var(--bad-soft)}
+.trow{display:grid;grid-template-columns:92px 1fr 40px;gap:8px;align-items:center}
+.trow input{min-width:0;width:100%;font-size:16px;color:var(--fg);background:var(--surface-2);border:1.5px solid transparent;border-radius:var(--r-md);padding:10px 12px}
+.trow input:focus{border-color:var(--accent);outline:none;background:var(--surface)}
+.trow input.p{font-family:var(--f-mono);font-weight:600}
+.trow button{height:40px;border:0;border-radius:10px;background:var(--bad-soft);color:var(--bad);font-size:18px;font-weight:700;cursor:pointer}
+.trhead{display:grid;grid-template-columns:92px 1fr 40px;gap:8px}
 </style>
 </head><body>
 
@@ -297,7 +309,7 @@ li .del.arm{color:var(--bad);background:var(--bad-soft);font-weight:700}
   </div>
   <section style="display:flex;flex-direction:column;gap:10px">
     <div class="listhead">
-      <h2>Abgebaut</h2>
+      <div style="display:flex;flex-direction:column;gap:6px;min-width:0"><h2>Abgebaut</h2><div class="tsum" id="typeSum"></div></div>
       <div class="btns">
         <button class="btn" id="copy" type="button">Kopieren</button>
         <button class="btn dark" id="csv" type="button">Excel / Teilen</button>
@@ -313,7 +325,7 @@ li .del.arm{color:var(--bad);background:var(--bad-soft);font-weight:700}
     </div>
     <button class="btn dark wide" id="finish" type="button">Fertig · Liste abschliessen</button>
   </section>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><a class="btn wide helpbtn" href="anleitung.html">Anleitung</a><a class="btn wide helpbtn" href="installieren.html">App teilen / installieren</a></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><a class="btn wide helpbtn" href="anleitung.html">Anleitung</a><a class="btn wide helpbtn" href="installieren.html">App teilen / installieren</a><button type="button" class="btn wide helpbtn" id="typesBtn" style="grid-column:1/-1">Gerätetypen verwalten</button></div>
   <footer class="credit"><img src="dplan-logo.png" alt="dplan IT Services"><span>Entwickelt von <b>Marco van der Ploeg</b></span></footer>
 </div>
 <div id="dlg" class="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgT"><div class="dlgbox"><h3 id="dlgT"></h3><p id="dlgP"></p><input id="dlgI" type="text" hidden><div class="dlgact" id="dlgA"></div></div></div>
@@ -337,6 +349,13 @@ li .del.arm{color:var(--bad);background:var(--bad-soft);font-weight:700}
   </form>
   <button class="btn wide" type="button" id="lgSolo">Ohne Team weiter (nur auf diesem Handy)</button>
   <a class="btn wide helpbtn" href="anleitung.html">Anleitung lesen</a>
+</div></div>
+<div id="types" class="hist" hidden><div class="wrap">
+  <div class="histhead"><h2>Gerätetypen</h2><button class="btn dark" id="typesClose" type="button">Fertig</button></div>
+  <p class="hint">Die App erkennt den Typ am Anfang der Asset-ID. Bei mehreren passenden Regeln gewinnt der längste Anfang. Änderungen gelten sofort, auch für schon erfasste Geräte.</p>
+  <div class="card" id="typeRows"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button class="btn" id="typeAdd" type="button">+ Regel hinzufügen</button><button class="btn" id="typeReset" type="button">Standard wiederherstellen</button></div>
+  <div class="card"><div class="fld"><label class="lb" for="typeTest">Testen</label><input id="typeTest" class="code" type="text" placeholder="Asset-ID eingeben" autocapitalize="characters"></div><div id="typeTestOut" class="scanstate"></div></div>
 </div></div>
 <div id="toast" class="toast" hidden><span id="toastT"></span><button id="undo" type="button" hidden>Rückgängig</button></div>
 
@@ -2670,6 +2689,7 @@ function render(){
     const a=document.createElement("div");a.className="s";a.textContent=it.asset;
     if(it.neu){const ar=document.createElement("span");ar.className="arrow";ar.textContent="  →  ";a.append(ar,document.createTextNode(it.neu))}
     const meta=document.createElement("div");meta.className="meta";
+    {const ty=devType(it.asset);const tg=document.createElement("span");tg.className="tag dev"+(ty?"":" unk");tg.textContent=ty||"Unbekannt";meta.append(tg)}
     if(it.cond&&it.cond!=="ok"){const tg=document.createElement("span");tg.className="tag "+it.cond;tg.textContent=it.cond==="defekt"?"Defekt":"Spuren";meta.append(tg)}
     meta.append(document.createTextNode([it.by&&it.by!==myName()?"von "+it.by:"",it.etage,it.raum&&("Raum "+it.raum),it.buero,it.place&&("Platz "+it.place),it.note,fmtTime(it.ts)].filter(Boolean).join(" · ")));
     m.append(a,meta);
@@ -2687,7 +2707,7 @@ async function remove(id,silent){
 const isDup=a=>items.some(x=>norm(x.asset)===norm(a));
 async function saveRec(rec,el){
   rec.id="m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);rec.ts=Date.now();if(myName())rec.by=myName();
-  try{await put(rec);freshId=rec.id;lastSaved=rec.id;render();state("Gespeichert: "+rec.asset+". Nächster Monitor.","ok",el);toast("Gespeichert: "+rec.asset,true);if(navigator.vibrate)try{navigator.vibrate(60)}catch(e){};return true}
+  try{await put(rec);freshId=rec.id;lastSaved=rec.id;render();{const ty=devType(rec.asset);if(ty)state("Gespeichert: "+rec.asset+" · "+ty+". Nächstes Gerät.","ok",el);else state("Gespeichert: "+rec.asset+". Unbekannter Gerätetyp, richtiger Barcode erwischt?","warn",el);toast((ty?ty+" ":"")+"gespeichert: "+rec.asset,true);}if(navigator.vibrate)try{navigator.vibrate(60)}catch(e){};return true}
   catch(e){state("Speichern ging nicht ("+(e.code||e.message)+"). Nochmals versuchen.","err",el);return false}
 }
 async function saveAsset(raw){
@@ -2757,18 +2777,19 @@ async function scanPhoto(input,stEl,picksEl,onCode){
   }catch(err){state("Foto konnte nicht gelesen werden. Nochmals versuchen oder eintippen.","err",stEl)}
 }
 $("cam").addEventListener("change",e=>scanPhoto(e.target,$("scanstate"),$("picks"),c=>saveAsset(c)));
-$("camOld").addEventListener("change",e=>scanPhoto(e.target,$("escan"),$("epicks"),c=>{$("eOld").value=clean(c);checkExt();state(isDup(c)?c+" ist schon in der Liste.":"Alter Monitor erkannt."+($("eNew").value?"":" Jetzt den neuen scannen."),isDup(c)?"warn":"ok",$("escan"))}));
-$("camNew").addEventListener("change",e=>scanPhoto(e.target,$("escan"),$("epicks"),c=>{$("eNew").value=clean(c);checkExt();state("Neuer Monitor erkannt."+($("eOld").value?" Ort prüfen, dann speichern.":" Jetzt den alten scannen."),"ok",$("escan"))}));
+$("camOld").addEventListener("change",e=>scanPhoto(e.target,$("escan"),$("epicks"),c=>{$("eOld").value=clean(c);checkExt();state(isDup(c)?c+" ist schon in der Liste.":"Altes Gerät erkannt."+($("eNew").value?"":" Jetzt den neuen scannen."),isDup(c)?"warn":"ok",$("escan"))}));
+$("camNew").addEventListener("change",e=>scanPhoto(e.target,$("escan"),$("epicks"),c=>{$("eNew").value=clean(c);checkExt();state("Neues Gerät erkannt."+($("eOld").value?" Ort prüfen, dann speichern.":" Jetzt den alten scannen."),"ok",$("escan"))}));
 
 /* ---------- export ---------- */
-const HEAD=["Nr","Asset-ID (abgebaut)","Ersetzt durch (Asset-ID)","Etage","Raum","Bürobezeichnung","Arbeitsplatz","Zustand","Notiz","Erfasst","Erfasst von"];
-const rows=(arr)=>(arr||items).slice().sort((a,b)=>a.ts-b.ts).map((it,i)=>[i+1,it.asset,it.neu||"",it.etage||it.loc||"",it.raum||"",it.buero||"",it.place||"",condTxt(it.cond),it.note||"",new Date(it.ts).toLocaleString("de-CH"),it.by||""]);
+const HEAD=["Nr","Asset-ID (abgebaut)","Gerätetyp","Ersetzt durch (Asset-ID)","Etage","Raum","Bürobezeichnung","Arbeitsplatz","Zustand","Notiz","Erfasst","Erfasst von"];
+const rows=(arr)=>(arr||items).slice().sort((a,b)=>a.ts-b.ts).map((it,i)=>[i+1,it.asset,devType(it.asset)||"Unbekannt",it.neu||"",it.etage||it.loc||"",it.raum||"",it.buero||"",it.place||"",condTxt(it.cond),it.note||"",new Date(it.ts).toLocaleString("de-CH"),it.by||""]);
 const xname=(l)=>((l||activeList()||{}).name||"Monitore").replace(/[\\/:*?"<>|]+/g,"-").replace(/\s+/g,"_")+".xlsx";
 function makeXlsx(arr){
   const ws=XLSX.utils.aoa_to_sheet([HEAD,...rows(arr)]);
-  ws["!cols"]=[{wch:5},{wch:20},{wch:22},{wch:10},{wch:10},{wch:20},{wch:13},{wch:16},{wch:28},{wch:18},{wch:16}];
+  ws["!cols"]=[{wch:5},{wch:20},{wch:22},{wch:22},{wch:10},{wch:10},{wch:20},{wch:13},{wch:16},{wch:28},{wch:18},{wch:16}];
   ws["!autofilter"]={ref:ws["!ref"]};
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Abgebaut");
+  {const c=typeCounts(arr||items);const sum=[["Gerätetyp","Anzahl"],...c.map(x=>[x.t,x.n]),["Total",(arr||items).length]];const s2=XLSX.utils.aoa_to_sheet(sum);s2["!cols"]=[{wch:24},{wch:10}];XLSX.utils.book_append_sheet(wb,s2,"Übersicht")}
   return new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
 }
 $("copy").onclick=async()=>{
@@ -2839,8 +2860,8 @@ $("gal").addEventListener("change",async e=>{
   const parts=[saved+" gespeichert"];if(dup)parts.push(dup+" schon erfasst");if(none)parts.push(none+" ohne erkennbaren Barcode");if(unsure)parts.push(unsure+" bitte unten auswählen");
   state(files.length+(files.length===1?" Foto: ":" Fotos: ")+parts.join(", ")+".",none||unsure?"warn":"ok");
 });
-$("galOld").addEventListener("change",e=>scanPhoto(e.target,$("escan"),$("epicks"),c=>{$("eOld").value=clean(c);checkExt();state(isDup(c)?c+" ist schon in der Liste.":"Alter Monitor erkannt."+($("eNew").value?"":" Jetzt den neuen scannen."),isDup(c)?"warn":"ok",$("escan"))}));
-$("galNew").addEventListener("change",e=>scanPhoto(e.target,$("escan"),$("epicks"),c=>{$("eNew").value=clean(c);checkExt();state("Neuer Monitor erkannt."+($("eOld").value?" Ort prüfen, dann speichern.":" Jetzt den alten scannen."),"ok",$("escan"))}));
+$("galOld").addEventListener("change",e=>scanPhoto(e.target,$("escan"),$("epicks"),c=>{$("eOld").value=clean(c);checkExt();state(isDup(c)?c+" ist schon in der Liste.":"Altes Gerät erkannt."+($("eNew").value?"":" Jetzt den neuen scannen."),isDup(c)?"warn":"ok",$("escan"))}));
+$("galNew").addEventListener("change",e=>scanPhoto(e.target,$("escan"),$("epicks"),c=>{$("eNew").value=clean(c);checkExt();state("Neues Gerät erkannt."+($("eOld").value?" Ort prüfen, dann speichern.":" Jetzt den alten scannen."),"ok",$("escan"))}));
 
 /* ---------- Listen & Verlauf ---------- */
 let lists=[], activeId=null;
@@ -2873,7 +2894,7 @@ $("finish").onclick=()=>{
   if(!items.length){toast("Liste ist noch leer");return}
   const ext=items.filter(x=>x.neu).length;
   ask("Wirklich alles erfasst?",
-    items.length+" Monitor"+(items.length===1?"":"e")+" in «"+a.name+"»"+(ext?" ("+ext+" mit Ersatzgerät)":"")+". Danach wird die Liste abgeschlossen und im Verlauf gespeichert. Du kannst sie jederzeit wieder öffnen.",
+    items.length+" Gerät"+(items.length===1?"":"e")+" in «"+a.name+"»"+(ext?" ("+ext+" mit Ersatzgerät)":"")+". Danach wird die Liste abgeschlossen und im Verlauf gespeichert. Du kannst sie jederzeit wieder öffnen.",
     [{label:"Zurück"},{label:"Ja, abschliessen",cls:"dark",fn:()=>{
       a.closed=Date.now();persist();const done=a;startNew();
       toast("«"+done.name+"» abgeschlossen");
@@ -2888,7 +2909,7 @@ function renderHist(){
     const d=document.createElement("div");d.className="hitem"+(l.id===activeId?" active":"");
     const h=document.createElement("div");h.className="hn";h.textContent=l.name;
     const pill=document.createElement("span");pill.className="pill "+(l.closed?"done":"open");pill.textContent=l.id===activeId?"aktiv":l.closed?"abgeschlossen":"offen";h.append(pill);
-    const m=document.createElement("div");m.className="hm";m.textContent=n+" Monitor"+(n===1?"":"e")+" · erstellt "+fmtDay(l.created)+(l.closed?" · abgeschlossen "+fmtDay(l.closed):" · zuletzt "+fmtDay(l.updated||l.created));
+    const m=document.createElement("div");m.className="hm";m.textContent=n+" Gerät"+(n===1?"":"e")+" · erstellt "+fmtDay(l.created)+(l.closed?" · abgeschlossen "+fmtDay(l.closed):" · zuletzt "+fmtDay(l.updated||l.created));
     const ac=document.createElement("div");ac.className="ha";
     const mk=(t,c,fn)=>{const b=document.createElement("button");b.type="button";b.className="btn "+(c||"");b.textContent=t;b.onclick=fn;ac.append(b)};
     if(l.id!==activeId)mk("Öffnen","dark",()=>{openList(l.id);$("hist").hidden=true;toast("«"+l.name+"» geöffnet")});
@@ -2918,7 +2939,7 @@ try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}ca
 const myName=()=>ls.get(LS+"-me","")||"";
 function needName(then){
   if(myName())return then(myName());
-  ask("Wie heisst du?","Dein Name steht beim Leader bei jedem Monitor, den du erfasst hast.",[{label:"Abbrechen"},{label:"Weiter",cls:"dark",fn:v=>{if(!v)return;ls.set(LS+"-me",v);items.forEach(x=>{if(!x.by)x.by=v});persist();then(v)}}],"");
+  ask("Wie heisst du?","Dein Name steht beim Leader bei jedem Gerät, das du erfasst hast.",[{label:"Abbrechen"},{label:"Weiter",cls:"dark",fn:v=>{if(!v)return;ls.set(LS+"-me",v);items.forEach(x=>{if(!x.by)x.by=v});persist();then(v)}}],"");
 }
 const F=["asset","neu","etage","raum","buero","place","cond","note"];
 const esc=v=>String(v||"").replace(/[|\n\r]/g," ");
@@ -2944,7 +2965,7 @@ $("sendLeader").onclick=()=>{
     ask("An Leader senden",(qrImg?"Leader tippt auf «Vom Team einsammeln → QR fotografieren» und fotografiert diesen Code. ":"Zu viele Einträge für einen QR-Code. ")+"Oder als Datei per Teams/WhatsApp schicken.",
       [{label:"Schliessen"},{label:"Als Datei senden",cls:"dark",fn:()=>shareJSON(l,by)}]);
     if(qrImg){const q=document.createElement("div");q.className="qrbox";const im=document.createElement("img");im.src=qrImg;im.alt="QR-Code mit "+items.length+" Einträgen";q.append(im);
-      const c=document.createElement("div");c.className="code";c.textContent=l.name+" · "+items.length+" Monitore · "+by;
+      const c=document.createElement("div");c.className="code";c.textContent=l.name+" · "+items.length+" Geräte · "+by;
       box.after(q);q.after(c);const clean=()=>{q.remove();c.remove()};$("dlgA").querySelectorAll("button").forEach(b=>b.addEventListener("click",clean,{once:true}));$("dlg").addEventListener("click",function h(e){if(e.target.id==="dlg"){clean();$("dlg").removeEventListener("click",h)}})}
   });
 };
@@ -2975,7 +2996,7 @@ function mergeIn(data){
 function report(rs){
   const a=rs.reduce((s,r)=>s+r.added,0),d=rs.reduce((s,r)=>s+r.dup,0),f=rs.reduce((s,r)=>s+r.filled,0);
   const who=[...new Set(rs.map(r=>r.by).filter(Boolean))].join(", ");
-  ask("Eingesammelt",(who?"Von "+who+": ":"")+a+" neu übernommen, "+d+" doppelte herausgefiltert"+(f?" ("+f+" davon mit Zusatzinfos ergänzt)":"")+". Liste «"+rs[rs.length-1].code+"» hat jetzt "+items.length+" Monitore.",[{label:"OK",cls:"dark"}]);
+  ask("Eingesammelt",(who?"Von "+who+": ":"")+a+" neu übernommen, "+d+" doppelte herausgefiltert"+(f?" ("+f+" davon mit Zusatzinfos ergänzt)":"")+". Liste «"+rs[rs.length-1].code+"» hat jetzt "+items.length+" Geräte.",[{label:"OK",cls:"dark"}]);
 }
 $("importBtn").onclick=()=>ask("Vom Team einsammeln","Fotografiere den QR-Code vom Handy deines Kollegen, oder öffne die Dateien, die sie dir geschickt haben. Doppelte Asset-IDs werden automatisch herausgefiltert.",[
   {label:"Abbrechen"},{label:"Datei öffnen",fn:()=>$("impFile").click()},{label:"QR fotografieren",cls:"dark",fn:()=>$("impQR").click()}]);
@@ -3103,7 +3124,7 @@ function renderRank(){
   items.forEach(x=>{const k=x.by||me||"Ohne Name";const o=m.get(k)||{n:0,ext:0,last:0};o.n++;if(x.neu)o.ext++;o.last=Math.max(o.last,x.ts||0);m.set(k,o)});
   const rows=[...m.entries()].sort((a,b)=>b[1].n-a[1].n||a[1].last-b[1].last);
   const max=rows[0][1].n;
-  $("rankSub").textContent=rows.length+(rows.length===1?" Person":" Personen")+" · "+items.length+" Monitore";
+  $("rankSub").textContent=rows.length+(rows.length===1?" Person":" Personen")+" · "+items.length+" Geräte";
   const ol=$("rankList");ol.innerHTML="";
   let place=0,prev=null;
   rows.forEach(([name,o],i)=>{
@@ -3120,6 +3141,32 @@ function renderRank(){
   box.hidden=false;
 }
 const _renderBase=render;render=function(){_renderBase();renderRank()};
+
+/* ---------- Gerätetypen nach Asset-ID ---------- */
+const TYPES_DEFAULT=[{p:"22000",t:"Thin Client / Tower"},{p:"42000",t:"Monitor"},{p:"32000",t:"Laptop"},{p:"62000",t:"Docking HP"},{p:"72000",t:"Docking Lenovo"}];
+let TYPES=ls.get(LS+"-types",null)||TYPES_DEFAULT.map(x=>({...x}));
+function devType(a){const id=norm(a);let best=null;TYPES.forEach(r=>{const p=norm(r.p);if(p&&r.t&&id.startsWith(p)&&(!best||p.length>norm(best.p).length))best=r});return best?best.t:""}
+function typeCounts(arr){const m=new Map();arr.forEach(x=>{const t=devType(x.asset)||"Unbekannt";m.set(t,(m.get(t)||0)+1)});return [...m.entries()].map(([t,n])=>({t,n})).sort((a,b)=>(a.t==="Unbekannt")-(b.t==="Unbekannt")||b.n-a.n)}
+function renderTypeSum(){const box=$("typeSum");box.innerHTML="";if(!items.length)return;typeCounts(items).forEach(c=>{const s=document.createElement("span");if(c.t==="Unbekannt")s.className="unk";const b=document.createElement("b");b.textContent=c.n;s.append(b,document.createTextNode(c.t));box.append(s)})}
+const _renderT=render;render=function(){_renderT();renderTypeSum()};
+function saveTypes(){TYPES=TYPES.filter(r=>r.p.trim()||r.t.trim());ls.set(LS+"-types",TYPES);render()}
+function renderTypeRows(){
+  const box=$("typeRows");box.innerHTML='<div class="trhead"><span class="lb">ID beginnt mit</span><span class="lb">Gerätetyp</span><span></span></div>';
+  TYPES.forEach((r,i)=>{
+    const row=document.createElement("div");row.className="trow";
+    const p=document.createElement("input");p.className="p";p.value=r.p;p.inputMode="numeric";p.placeholder="z. B. 42000";p.setAttribute("aria-label","ID beginnt mit");
+    const t=document.createElement("input");t.value=r.t;t.placeholder="z. B. Monitor";t.setAttribute("aria-label","Gerätetyp");
+    p.oninput=()=>{r.p=p.value.trim();ls.set(LS+"-types",TYPES);testType()};t.oninput=()=>{r.t=t.value.trim();ls.set(LS+"-types",TYPES);testType()};
+    const d=document.createElement("button");d.type="button";d.textContent="×";d.setAttribute("aria-label","Regel löschen");d.onclick=()=>{TYPES.splice(i,1);saveTypes();renderTypeRows()};
+    row.append(p,t,d);box.append(row);
+  });
+}
+function testType(){const v=$("typeTest").value;const o=$("typeTestOut");if(!v.trim()){o.textContent="";return}const ty=devType(v);o.className="scanstate "+(ty?"ok":"err");o.textContent=ty?"→ "+ty:"→ Kein Typ gefunden"}
+$("typeTest").addEventListener("input",testType);
+$("typesBtn").onclick=()=>{renderTypeRows();$("types").hidden=false;$("types").scrollTop=0};
+$("typesClose").onclick=()=>{saveTypes();$("types").hidden=true};
+$("typeAdd").onclick=()=>{TYPES.push({p:"",t:""});renderTypeRows();const ins=$("typeRows").querySelectorAll(".trow input.p");ins[ins.length-1].focus()};
+$("typeReset").onclick=()=>ask("Standard wiederherstellen?","Deine eigenen Regeln werden durch die Standardliste ersetzt.",[{label:"Abbrechen"},{label:"Wiederherstellen",cls:"dark",fn:()=>{TYPES=TYPES_DEFAULT.map(x=>({...x}));saveTypes();renderTypeRows()}}]);
 (function boot(){
   {const l=ls.get(LS+"-loc",{})||{};$("eFloor").value=l.etage||"";$("eRoom").value=l.raum||"";$("eOffice").value=l.buero||""}
   setMode(ls.get(LS+"-mode","quick"));
