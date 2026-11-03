@@ -67,112 +67,92 @@ a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 <div class="wrap">
   <header><span class="logo"><img src="dplan-logo.png" alt="dplan IT Services"></span><b>Anleitung</b><a class="back" href="./">Zur App</a></header>
 
-  <h1>Monitor-Rücknahme in 5 Minuten</h1>
-  <p class="lead">Abgebaute Monitore per Asset-ID erfassen, allein oder im Team, und am Schluss als Excel-Liste exportieren.</p>
+  <h1>So funktioniert die Monitor-Rücknahme</h1>
+  <p class="lead">Der Dispatcher plant den Auftrag mit allen Infos. Der Lead holt sein Team per QR-Code dazu. Alle erfassen Geräte und Material. Am Schluss gibt's eine fertige Excel-Liste, ohne Nacharbeit im Büro.</p>
   <nav>
-    <a href="installieren.html">Installieren (mit QR)</a><a href="#scannen">Scannen</a><a href="#erweitert">Erweitert</a><a href="#listen">Listen &amp; Excel</a><a href="#team">Team-Rollout</a><a href="#probleme">Probleme</a>
+    <a href="installieren.html">Installieren (mit QR)</a><a href="#konto">Konto</a><a href="#rollen">Rollen</a><a href="#dispatcher">Dispatcher</a><a href="#lead">Lead</a><a href="#erfassen">Erfassen</a><a href="#probleme">Probleme</a>
   </nav>
 
-  <section id="installieren">
-    <h2><span class="ic">1</span>App installieren</h2>
-    <p>Einmalig, dauert 30 Sekunden.</p>
-    <ol class="steps">
-      <li><span><code>dizhyzh.github.io/monitor-ruecknahme</code> in <b>Chrome</b> öffnen, nicht in Samsung Internet.</span></li>
-      <li><span>Oben rechts <span class="ui">⋮</span> und dann <span class="ui">App installieren</span> oder <span class="ui">Zum Startbildschirm hinzufügen</span>.</span></li>
-      <li><span>Die App ab jetzt über das blaue Barcode-Icon starten. Nach dem ersten Öffnen läuft sie auch ohne Internet.</span></li>
-    </ol>
-  </section>
-
   <section id="konto">
-    <h2><span class="ic">★</span>Konto erstellen und anmelden</h2>
-    <p>Beim ersten Start einmalig, danach bleibst du angemeldet, auch offline.</p>
+    <h2><span class="ic">1</span>Konto erstellen</h2>
+    <p>Einmalig. Danach bleibst du angemeldet, auch offline.</p>
     <ol class="steps">
-      <li><span><span class="ui">Konto erstellen</span> wählen, Name, E-Mail und einen eigenen <b>PIN mit mindestens 6 Ziffern</b> eingeben.</span></li>
-      <li><span>Auf einem anderen Gerät oder nach dem Abmelden: <span class="ui">Anmelden</span> mit E-Mail und PIN.</span></li>
-      <li><span>Oben rechts der runde Knopf mit deinem Anfangsbuchstaben: PIN ändern oder abmelden. Der <b>Name ist fest</b> mit dem Konto verbunden. Tippfehler? Beim Admin melden.</span></li>
+      <li><span>App öffnen und <span class="ui">Konto erstellen</span> wählen.</span></li>
+      <li><span>Vor- und Nachname, E-Mail und einen eigenen <b>PIN mit mindestens 6 Ziffern</b> eingeben.</span></li>
+      <li><span>Der Name erscheint bei «Erfasst durch» und ist danach <b>fest</b>. Tippfehler? Beim Admin melden.</span></li>
     </ol>
-    <div class="box tip"><b>Zwei verschiedene PINs:</b> Dein <b>Konto-PIN</b> ist geheim und nur für dich. Der <b>Rollout-PIN</b> gilt für einen Einsatz und wird im Team geteilt.</div>
+    <div class="box tip"><b>Profil:</b> Oben rechts der runde Knopf mit deinem Anfangsbuchstaben. Dort änderst du den PIN oder meldest dich ab.</div>
   </section>
 
-  <section id="scannen">
-    <h2><span class="ic">2</span>Schnell scannen</h2>
-    <p>Der Standard-Modus. Ein Foto pro Monitor reicht.</p>
-    <ol class="steps">
-      <li><span>Auf <span class="ui">Asset-ID scannen</span> tippen. Die Kamera geht auf.</span></li>
-      <li><span>Das Asset-Label scharf und gerade fotografieren. Der Code wird erkannt und <b>sofort gespeichert</b>.</span></li>
-      <li><span>Nächster Monitor. Unten zählt die Liste mit, der neueste Eintrag ist blau markiert.</span></li>
-    </ol>
+  <section id="rollen">
+    <h2><span class="ic">2</span>Wer macht was?</h2>
     <ul>
-      <li><span class="ui">Aus Galerie</span>: Fotos von vorhin auf einmal einlesen, auch mehrere.</li>
-      <li><b>Eintippen</b> geht auch, dann mit <span class="ui">Speichern</span> oder Enter bestätigen.</li>
-      <li><b>Auto-Enter</b>: Mit einem Handscanner oder der Scan-Funktion der Tastatur wird der Code direkt gespeichert.</li>
-      <li><b>Falsch gescannt?</b> Unten erscheint ein paar Sekunden <span class="ui">Rückgängig</span>. Sonst in der Liste auf <span class="ui">Löschen</span>, dann <span class="ui">Sicher?</span>.</li>
-      <li><b>Gerätetyp</b> wird an der Asset-ID erkannt: <code>42000…</code> Monitor, <code>22000…</code> Thin Client/Tower, <code>32000…</code> Laptop, <code>62000…</code> Docking HP, <code>72000…</code> Docking Lenovo. Ein rotes «Unbekannt» heisst meist: falscher Barcode erwischt. Die Regeln passt du unten unter <span class="ui">Gerätetypen verwalten</span> an.</li>
-      <li><b>Doppelt gescannt?</b> Die App merkt es und speichert nichts.</li>
+      <li><b>Dispatcher</b> (Jetmir, Albin, Besim): eröffnet Aufträge mit allen Infos, bestimmt den Lead, sieht alle Aufträge, pflegt den Material-Katalog.</li>
+      <li><b>Lead</b>: bekommt den Auftrag zugewiesen, lädt sein Team per QR ein und schliesst den Auftrag ab.</li>
+      <li><b>Techniker</b>: erfasst Geräte und Material in den Aufträgen, in die er eingeladen wurde.</li>
+      <li><b>Admin</b>: vergibt die Rollen unter <span class="ui">Benutzer</span>.</li>
     </ul>
   </section>
 
-  <section id="erweitert">
-    <h2><span class="ic">3</span>Erweitert: mit Ort und Ersatzgerät</h2>
-    <p>Oben auf <span class="ui">Erweitert</span> umschalten, wenn ihr dokumentieren müsst, wo was getauscht wurde.</p>
+  <section id="dispatcher">
+    <h2><span class="ic">3</span>Dispatcher: Auftrag eröffnen</h2>
     <ol class="steps">
-      <li><span><b>Abgebaut</b>: Asset-ID vom alten Monitor scannen. Der Cursor springt danach zu «Ersetzt durch».</span></li>
-      <li><span><b>Ersetzt durch</b>: Asset-ID vom neuen Monitor scannen.</span></li>
-      <li><span>Etage, Raum, Bürobezeichnung und Arbeitsplatz ausfüllen, dazu Zustand und Notiz, falls nötig.</span></li>
-      <li><span><span class="ui">Speichern</span>. Etage, Raum und Büro bleiben stehen, für den nächsten Platz im gleichen Raum.</span></li>
+      <li><span>Startseite → <span class="ui">+ Neuer Auftrag</span>.</span></li>
+      <li><span><b>Rollout</b> für einen Standort, <b>Tour</b> für mehrere Standorte, z. B. 14 Orte mit je 2–3 Geräten.</span></li>
+      <li><span>Alle Felder mit <span class="req" style="color:#c0352b">✱</span> ausfüllen: Kunde, Datum, Zeit, Lead und pro Standort Adresse, Ansprechperson, Telefon und <b>Soll-Menge</b> pro Gerätetyp.</span></li>
+      <li><span>Unter «Mitnehmen» eintragen, was das Team einpacken muss, z. B. Klett und Kabel.</span></li>
+      <li><span><span class="ui">Auftrag freigeben</span>. Fehlt etwas, zeigt die App rot, was noch fehlt. Der Auftragscode wird automatisch gebildet, z. B. <code>HWLC_VBZ_2026_11_04</code>.</span></li>
+    </ol>
+    <div class="box tip"><b>Danach</b> sieht der Lead den Auftrag sofort in seiner App. Bearbeiten geht jederzeit über <span class="ui">Bearbeiten</span>, auch der Lead lässt sich dort wechseln.</div>
+  </section>
+
+  <section id="lead">
+    <h2><span class="ic">4</span>Lead: Team einladen und abschliessen</h2>
+    <ol class="steps">
+      <li><span>Auftrag öffnen → <span class="ui">Team einladen (QR)</span>.</span></li>
+      <li><span>Kollegen scannen den QR-Code mit der Handy-Kamera oder in der App mit <span class="ui">Einladung scannen</span>. Schon sind sie dabei. Der Code gilt 24 Stunden.</span></li>
+      <li><span>Am Schluss <span class="ui">Abschliessen</span>. Die App zeigt, ob laut Soll noch Geräte fehlen. Danach kann niemand mehr etwas erfassen.</span></li>
+      <li><span><span class="ui">Excel</span> herunterladen, oder der Dispatcher holt es sich selbst.</span></li>
     </ol>
   </section>
 
-  <section id="listen">
-    <h2><span class="ic">4</span>Listen, Verlauf und Excel</h2>
+  <section id="erfassen">
+    <h2><span class="ic">5</span>Erfassen</h2>
+    <p>Auftrag öffnen → <span class="ui">Erfassen starten</span>. Bei einer Tour oben den <b>aktuellen Standort</b> wählen.</p>
     <ul>
-      <li>Alles wird <b>sofort gespeichert</b>. App schliessen ist kein Problem.</li>
-      <li>Oben auf den <b>Listennamen</b> tippen, um ihn umzubenennen, z. B. nach Kunde oder Gebäude.</li>
-      <li><span class="ui">Excel / Teilen</span> erstellt eine .xlsx mit allen Spalten und schickt sie direkt per Mail, Teams oder OneDrive.</li>
-      <li><span class="ui">Fertig · Liste abschliessen</span> fragt nach, ob wirklich alles erfasst ist, speichert die Liste im Verlauf und startet eine neue.</li>
-      <li><span class="ui">Verlauf</span> zeigt alle Listen. Dort kannst du sie <b>öffnen</b> und weiterbearbeiten, als Excel exportieren, umbenennen oder löschen.</li>
+      <li><b>Laptop mit Handscanner:</b> Einfach scannen. Das Scanfeld ist immer bereit, ein kurzer Piep heisst gespeichert. Ein tiefer Doppelton heisst: schon erfasst, unbekannter Gerätetyp oder mehr als geplant. Die Meldung steht dann farbig im Feld.</li>
+      <li><b>Handy:</b> <span class="ui">Kamera</span> für ein Foto vom Label oder <span class="ui">Galerie</span> für mehrere Fotos auf einmal.</li>
+      <li><b>Gerätetyp</b> wird an der Asset-ID erkannt: <code>42000…</code> Monitor, <code>22000…</code> Thin Client/Tower, <code>32000…</code> Laptop, <code>62000…</code> Docking HP, <code>72000…</code> Docking Lenovo.</li>
+      <li><b>Details zum Gerät:</b> Etage, Raum und Büro bleiben stehen. Arbeitsplatz, «Ersetzt durch», Zustand und Notiz gelten nur fürs nächste Gerät.</li>
+      <li><b>Material verbraucht:</b> Antippen, was du eingebaut hast, z. B. «+ HDMI 2 m». Etage und Raum kommen automatisch aus den Details. Das ist verrechenbar, also bitte nicht vergessen.</li>
+      <li><b>Fortschritt</b> zeigt Ist / Soll pro Gerätetyp. In der Liste löschst du eigene Einträge mit <span class="ui">Löschen</span> und dann <span class="ui">Sicher?</span>.</li>
     </ul>
-  </section>
-
-  <section id="team">
-    <h2><span class="ic">5</span>Team-Rollout: alle in einer Liste</h2>
-    <p>Mehrere Leute im Einsatz? Alle melden sich mit dem gleichen <b>Rollout-Titel</b> und <b>PIN</b> an und sehen live dieselbe Liste.</p>
-    <div class="roles">
-      <div class="role"><h3>Leader</h3><ol>
-        <li><span class="ui">Team-Login</span> antippen.</li>
-        <li>Neuen Titel eingeben, z. B. <code>HWLC_VBZ_2026_11_03</code>.</li>
-        <li>Rollout-PIN wählen (mind. 4 Zeichen).</li>
-        <li><span class="ui">Beitreten</span>. Damit ist der Rollout angelegt.</li>
-        <li>Titel und PIN ans Team geben.</li>
-      </ol></div>
-      <div class="role"><h3>Kollegen</h3><ol>
-        <li><span class="ui">Team-Login</span> antippen.</li>
-        <li>Gleichen Titel und Rollout-PIN eingeben. Dein Name kommt automatisch aus deinem Konto.</li>
-        <li><span class="ui">Beitreten</span> und normal scannen.</li>
-      </ol></div>
-    </div>
     <div class="status">
-      <div><span class="dot on"></span><span><b>Grün</b>: Live verbunden. Scans erscheinen nach wenigen Sekunden bei allen.</span></div>
-      <div><span class="dot wait"></span><span><b>Orange</b>: Kein Netz oder noch nicht hochgeladen. Weiterscannen, das wird automatisch nachgeholt.</span></div>
+      <div><span class="dot on"></span><span><b>Grün oben rechts</b>: verbunden, alle sehen deine Einträge nach wenigen Sekunden.</span></div>
+      <div><span class="dot wait"></span><span><b>Orange</b>: kein Netz. Einfach weiter erfassen, alles wird automatisch nachgeladen. Mit ⏳ markierte Zeilen warten noch.</span></div>
     </div>
+  </section>
+
+  <section>
+    <h2><span class="ic">6</span>Excel-Liste</h2>
+    <p>Pro Auftrag eine Datei mit fünf Blättern:</p>
     <ul>
-      <li>Hat ein Kollege den Monitor schon erfasst, kommt <b>«… hat Luca schon erfasst»</b>. Deine Zusatzinfos wie Raum oder Zustand werden beim bestehenden Eintrag ergänzt.</li>
-      <li>Der Bereich <b>«Erfasst durch»</b> über der Liste zeigt live, wer wie viele Geräte erfasst hat.</li>
-      <li>In Excel zeigt die Spalte <b>«Erfasst durch»</b>, wer welchen Monitor gescannt hat.</li>
-      <li>Am Schluss exportiert <b>einer</b> die Liste als Excel. Alle anderen müssen nichts machen.</li>
-      <li>Über <span class="ui">Team</span> meldest du dich ab oder wechselst den Rollout. Ohne Login läuft die App nur lokal auf deinem Handy.</li>
+      <li><b>Auftrag</b>: Kunde, Datum, Lead, Team und alle Standorte mit Kontakt</li>
+      <li><b>Geräte</b>: jede Asset-ID mit Typ, Standort, Etage, Raum, Zustand und «Erfasst durch»</li>
+      <li><b>Soll-Ist</b> pro Standort und Gerätetyp</li>
+      <li><b>Material</b> im Detail, mit Etage und Raum</li>
+      <li><b>Material Total</b> pro Standort und für den ganzen Auftrag, für die Verrechnung</li>
     </ul>
-    <div class="box warn"><b>Wichtig:</b> PIN nur im Team teilen, nicht in Gruppen-Chats mit Externen. Für jeden Einsatz einen neuen Titel verwenden.</div>
-    <div class="box tip"><b>Ohne Internet im Team?</b> Unten im Bereich «Team» schickt <span class="ui">An Leader senden</span> deine Scans als QR-Code oder Datei. Der Leader sammelt sie mit <span class="ui">Vom Team einsammeln</span> ein, Doppelte werden herausgefiltert.</div>
   </section>
 
   <section id="probleme">
     <h2><span class="ic">?</span>Wenn etwas nicht klappt</h2>
+    <details><summary>Ich sehe keinen Auftrag</summary><p>Du siehst nur Aufträge, in die du eingeladen bist oder bei denen du Lead bist. Den Lead um den QR-Code bitten.</p></details>
     <details><summary>Barcode wird nicht erkannt</summary><p>Näher ran, Handy gerade halten, Blitz aus (der spiegelt). Nur ein Label im Bild. Notfalls die Asset-ID eintippen.</p></details>
-    <details><summary>Kamera zeigt nur schwarz</summary><ul><li>App in <b>Chrome</b> öffnen, nicht Samsung Internet.</li><li>Schnellmenü: Kachel <b>Kamerazugriff</b> einschalten.</li><li>Einstellungen → Apps → Chrome → Berechtigungen → Kamera erlauben.</li></ul></details>
-    <details><summary>Neue Funktion fehlt nach einem Update</summary><p>App ganz schliessen (aus den letzten Apps wegwischen) und neu öffnen. Bei Bedarf zweimal. Die Scans bleiben erhalten.</p></details>
-    <details><summary>«Falscher PIN»</summary><p>Titel und PIN beim Leader nachfragen. Gross-/Kleinschreibung beim Titel beachten.</p></details>
-    <details><summary>Wo sind meine Daten?</summary><p>Ohne Team-Login nur auf deinem Handy. Mit Team-Login zusätzlich in der Datenbank des Rollouts (Supabase, Frankfurt), dort nur mit Titel und PIN lesbar.</p></details>
+    <details><summary>Einladung ungültig</summary><p>Der QR-Code ist älter als 24 Stunden oder der Auftrag ist abgeschlossen. Lead um einen neuen Code bitten.</p></details>
+    <details><summary>Neue Funktion fehlt nach einem Update</summary><p>App ganz schliessen (aus den letzten Apps wegwischen) und neu öffnen. Die Einträge bleiben erhalten.</p></details>
+    <details><summary>PIN vergessen</summary><p>Auf der Anmeldeseite «PIN vergessen?» tippen. Der Link kommt per Mail, auch im Spam-Ordner nachschauen.</p></details>
+    <details><summary>Wo sind die Daten?</summary><p>In der Datenbank (Supabase, Frankfurt). Lesen können nur angemeldete Kollegen, die im Auftrag dabei sind, und die Dispatcher.</p></details>
   </section>
 
   <footer>Entwickelt von <b>Marco van der Ploeg</b> · dplan IT Services</footer>
