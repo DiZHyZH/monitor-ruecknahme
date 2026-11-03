@@ -1,16 +1,55 @@
--- Korrektur 4: Standort-Maske (Pflichtfelder pro Auftrag) und Einträge bearbeiten
+-- Korrektur 4: Platzplanung
+-- Der Dispatcher plant pro Standort die Plätze (Etage, Raum, Bezeichnung, Platz, WO/INC, Arbeit, Geräte).
+-- Erfasst werden kann nur, was geplant ist: richtiger Platz, richtiger Gerätetyp, höchstens die geplante Menge.
 -- Einmal im SQL Editor ausführen (neue, leere Query → alles einfügen → Run). Darf mehrfach laufen.
 
-alter table public.jobs add column if not exists loc_req jsonb not null default '{}'::jsonb;
+alter table public.sites add column if not exists plaetze jsonb not null default '[]'::jsonb;
+alter table public.scans add column if not exists pos_id text;
+alter table public.scans add column if not exists wo text;
+create index if not exists scans_pos on public.scans (job_id, pos_id) where not deleted;
 
--- Pflichtfelder prüfen: was der Dispatcher eingeschaltet hat, muss ausgefüllt sein
-create or replace function public.mr_check_loc(p_job uuid, p jsonb) returns void
+-- Gerätetyp aus der Asset-ID (gleiche Regeln wie in der App)
+create or replace function public.mr_devtype(a text) returns text
+language sql immutable as $$
+  select case
+    when n like '42000%' then 'Monitor'
+    when n like '22000%' then 'Thin Client / Tower'
+    when n like '32000%' then 'Laptop'
+    when n like '62000%' then 'Docking HP'
+    when n like '72000%' then 'Docking Lenovo'
+  end from (select upper(regexp_replace(coalesce(a,''), '\s', '', 'g')) as n) x;
+$$;
+
+create or replace function public.mr_sum(j jsonb) returns int
+language sql immutable as $$
+  select coalesce(sum(case when value ~ '^\d+$' then value::int else 0 end), 0)::int from jsonb_each_text(coalesce(j, '{}'::jsonb));
+$$;
+create or replace function public.mr_clean_counts(j jsonb) returns jsonb
+language sql immutable as $$
+  select coalesce(jsonb_object_agg(key, value::int), '{}'::jsonb) from jsonb_each_text(coalesce(j, '{}'::jsonb)) where value ~ '^\d+$' and value::int > 0;
+$$;
+create or replace function public.mr_sum_counts(pl jsonb, d text) returns jsonb
+language sql immutable as $$
+  select coalesce(jsonb_object_agg(k, n), '{}'::jsonb) from (
+    select e.key as k, sum(e.value::int) as n from jsonb_array_elements(coalesce(pl,'[]'::jsonb)) p, jsonb_each_text(coalesce(p->'soll'->d, '{}'::jsonb)) e
+    where e.value ~ '^\d+$' group by e.key) x where n > 0;
+$$;
+
+-- Platz finden und prüfen, ob dieses Gerät dort geplant ist
+create or replace function public.mr_check_plan(p_job uuid, p_site uuid, p_pos text, p_dir text, p_asset text, p_ignore text) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare r jsonb := coalesce((select loc_req from public.jobs where id = p_job), '{}'::jsonb); k text;
+declare pl jsonb; t text := public.mr_devtype(p_asset); planned int; have int;
 begin
-  foreach k in array array['etage','raum','buero','place'] loop
-    if coalesce((r->>k)::boolean, false) and trim(coalesce(p->>k, '')) = '' then raise exception 'missing_loc:%', k; end if;
-  end loop;
+  select q into pl from public.sites s, jsonb_array_elements(s.plaetze) q where s.id = p_site and s.job_id = p_job and q->>'id' = p_pos;
+  if pl is null then raise exception 'bad_pos'; end if;
+  if t is null then raise exception 'unknown_type'; end if;
+  if (pl->>'art' = 'auf' and p_dir <> 'auf') or (pl->>'art' = 'ab' and p_dir <> 'ab') then raise exception 'wrong_art'; end if;
+  planned := coalesce((pl->'soll'->p_dir->>t)::int, 0);
+  if planned = 0 then raise exception 'not_planned:%', t; end if;
+  select count(*) into have from public.scans x where x.job_id = p_job and x.pos_id = p_pos and x.dir = p_dir and not x.deleted
+    and public.mr_devtype(x.asset) = t and x.id is distinct from p_ignore;
+  if have >= planned then raise exception 'over_plan:%:%', t, planned; end if;
+  return pl;
 end $$;
 
 create or replace function public.job_save(p jsonb) returns jsonb
@@ -25,10 +64,7 @@ declare
   v_lead uuid := nullif(p->>'lead','')::uuid;
   v_sites jsonb := coalesce(p->'sites','[]'::jsonb);
   s jsonb; i int := 0; v_code text; base text; n int := 1; keep uuid[] := '{}';
-  first_label text;
-  v_req jsonb := jsonb_build_object(
-    'etage', coalesce((p->'loc_req'->>'etage')::boolean, false), 'raum', coalesce((p->'loc_req'->>'raum')::boolean, false),
-    'buero', coalesce((p->'loc_req'->>'buero')::boolean, false), 'place', coalesce((p->'loc_req'->>'place')::boolean, false));
+  first_label text; pz jsonb; pk int; v_pl jsonb; v_soll jsonb;
 begin
   perform public.mr_auth();
   if not public.mr_is_disp() then raise exception 'dispatcher_only'; end if;
@@ -44,10 +80,15 @@ begin
     i := i + 1;
     if trim(coalesce(s->>'strasse','')) = '' or trim(coalesce(s->>'plz','')) = '' or trim(coalesce(s->>'ort','')) = '' then raise exception 'missing:adresse:%', i; end if;
     if trim(coalesce(s->>'kontakt','')) = '' or trim(coalesce(s->>'telefon','')) = '' then raise exception 'missing:kontakt:%', i; end if;
-    -- Soll: {"ab":{Typ:n}, "auf":{Typ:n}}; mindestens eine Zahl > 0
-    if not exists (
-      select 1 from jsonb_each(coalesce(s->'soll','{}'::jsonb)) d, jsonb_each_text(case when jsonb_typeof(d.value) = 'object' then d.value else jsonb_build_object(d.key, d.value) end) e
-      where e.value ~ '^\d+$' and e.value::int > 0) then raise exception 'missing:soll:%', i; end if;
+    if coalesce(jsonb_typeof(s->'plaetze'),'') <> 'array' or jsonb_array_length(s->'plaetze') = 0 then raise exception 'missing:plaetze:%', i; end if;
+    pk := 0;
+    for pz in select * from jsonb_array_elements(s->'plaetze') loop
+      pk := pk + 1;
+      if trim(coalesce(pz->>'etage','')) = '' or trim(coalesce(pz->>'raum','')) = '' then raise exception 'missing:platz_ort:%:%', i, pk; end if;
+      if coalesce(pz->>'art','') not in ('tausch','auf','ab') then raise exception 'missing:platz_art:%:%', i, pk; end if;
+      if pz->>'art' in ('tausch','ab') and public.mr_sum(pz->'soll'->'ab') = 0 then raise exception 'missing:platz_ab:%:%', i, pk; end if;
+      if pz->>'art' in ('tausch','auf') and public.mr_sum(pz->'soll'->'auf') = 0 then raise exception 'missing:platz_auf:%:%', i, pk; end if;
+    end loop;
   end loop;
 
   first_label := coalesce(nullif(trim(v_sites->0->>'gebaeude'),''), trim(v_sites->0->>'ort'));
@@ -57,13 +98,13 @@ begin
   if v_id is null then
     v_code := base;
     while exists (select 1 from public.jobs where code = v_code) loop n := n + 1; v_code := base || '_' || n; end loop;
-    insert into public.jobs(code, art, kunde, datum, zeit_von, zeit_bis, wo, lead, material, loc_req, tausch, notes, created_by)
-    values (v_code, v_art, v_kunde, v_datum, v_von, v_bis, nullif(trim(p->>'wo'),''), v_lead, coalesce(p->'material','[]'::jsonb), v_req,
+    insert into public.jobs(code, art, kunde, datum, zeit_von, zeit_bis, wo, lead, material, tausch, notes, created_by)
+    values (v_code, v_art, v_kunde, v_datum, v_von, v_bis, nullif(trim(p->>'wo'),''), v_lead, coalesce(p->'material','[]'::jsonb),
             case when p->>'tausch' ~ '^(\d:\d|frei)$' then p->>'tausch' else '1:1' end, nullif(trim(p->>'notes'),''), auth.uid())
     returning id into v_id;
   else
     update public.jobs set art = v_art, kunde = v_kunde, datum = v_datum, zeit_von = v_von, zeit_bis = v_bis,
-      wo = nullif(trim(p->>'wo'),''), lead = v_lead, material = coalesce(p->'material','[]'::jsonb), loc_req = v_req,
+      wo = nullif(trim(p->>'wo'),''), lead = v_lead, material = coalesce(p->'material','[]'::jsonb),
       tausch = case when p->>'tausch' ~ '^(\d:\d|frei)$' then p->>'tausch' else tausch end,
       notes = nullif(trim(p->>'notes'),''), updated_at = now()
     where id = v_id;
@@ -74,12 +115,29 @@ begin
   for s in select * from jsonb_array_elements(v_sites) loop
     i := i + 1;
     keep := keep || coalesce(nullif(s->>'id','')::uuid, gen_random_uuid());
-    insert into public.sites(id, job_id, pos, gebaeude, strasse, plz, ort, kontakt, telefon, zutritt, soll)
+    select coalesce(jsonb_agg(jsonb_build_object(
+        'id', coalesce(nullif(e->>'id',''), gen_random_uuid()::text),
+        'etage', trim(e->>'etage'), 'raum', trim(e->>'raum'), 'buero', nullif(trim(coalesce(e->>'buero','')),''), 'place', nullif(trim(coalesce(e->>'place','')),''),
+        'wo', nullif(trim(coalesce(e->>'wo','')),''), 'art', e->>'art',
+        'tausch', case when e->>'tausch' ~ '^\d:\d$' then e->>'tausch' else '1:1' end,
+        'soll', jsonb_build_object('ab', case when e->>'art' in ('tausch','ab') then public.mr_clean_counts(e->'soll'->'ab') else '{}'::jsonb end,
+                                   'auf', case when e->>'art' in ('tausch','auf') then public.mr_clean_counts(e->'soll'->'auf') else '{}'::jsonb end)
+      ) order by o), '[]'::jsonb) into v_pl
+    from jsonb_array_elements(s->'plaetze') with ordinality as t(e, o);
+    v_soll := jsonb_build_object('ab', public.mr_sum_counts(v_pl, 'ab'), 'auf', public.mr_sum_counts(v_pl, 'auf'));
+    -- Plätze mit Einträgen dürfen nicht verschwinden
+    if exists (select 1 from public.scans x where x.site_id = keep[i] and not x.deleted and x.pos_id is not null
+               and not exists (select 1 from jsonb_array_elements(v_pl) q where q->>'id' = x.pos_id)) then raise exception 'pos_has_data'; end if;
+    insert into public.sites(id, job_id, pos, gebaeude, strasse, plz, ort, kontakt, telefon, zutritt, soll, plaetze)
     values (keep[i], v_id, i, nullif(trim(s->>'gebaeude'),''), trim(s->>'strasse'), trim(s->>'plz'), trim(s->>'ort'),
-            trim(s->>'kontakt'), trim(s->>'telefon'), nullif(trim(s->>'zutritt'),''), coalesce(s->'soll','{}'::jsonb))
+            trim(s->>'kontakt'), trim(s->>'telefon'), nullif(trim(s->>'zutritt'),''), v_soll, v_pl)
     on conflict (id) do update set pos = excluded.pos, gebaeude = excluded.gebaeude, strasse = excluded.strasse, plz = excluded.plz,
-      ort = excluded.ort, kontakt = excluded.kontakt, telefon = excluded.telefon, zutritt = excluded.zutritt, soll = excluded.soll
+      ort = excluded.ort, kontakt = excluded.kontakt, telefon = excluded.telefon, zutritt = excluded.zutritt, soll = excluded.soll, plaetze = excluded.plaetze
     where public.sites.job_id = v_id;
+    -- Ortsangaben bestehender Einträge an geänderte Plätze anpassen
+    update public.scans x set etage = q->>'etage', raum = q->>'raum', buero = q->>'buero', place = q->>'place', wo = q->>'wo'
+      from jsonb_array_elements(v_pl) q where x.site_id = keep[i] and x.pos_id = q->>'id' and not x.deleted
+        and (x.etage is distinct from q->>'etage' or x.raum is distinct from q->>'raum' or x.buero is distinct from q->>'buero' or x.place is distinct from q->>'place' or x.wo is distinct from q->>'wo');
   end loop;
   -- entfernte Standorte löschen, aber nur wenn dort nichts erfasst wurde
   if exists (select 1 from public.sites st where st.job_id = v_id and not (st.id = any(keep))
@@ -92,36 +150,23 @@ begin
   return (select public.mr_job_json(j) from public.jobs j where j.id = v_id);
 end $$;
 
+-- Gerät erfassen: nur an geplanten Plätzen, Ort kommt immer aus dem Plan
 create or replace function public.scan_add(p_job uuid, p jsonb) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
 declare ex public.scans; n text := upper(regexp_replace(coalesce(p->>'asset',''), '\s', '', 'g')); v_site uuid := nullif(p->>'site_id','')::uuid;
-  v_dir text := coalesce(nullif(p->>'dir',''), 'ab');
+  v_dir text := coalesce(nullif(p->>'dir',''), 'ab'); pl jsonb;
 begin
   perform public.mr_need_job(p_job, true);
   if n = '' then raise exception 'no_asset'; end if;
   if v_dir not in ('ab','auf') then raise exception 'bad_dir'; end if;
-  perform public.mr_check_loc(p_job, p);
   if v_site is null or not exists (select 1 from public.sites where id = v_site and job_id = p_job) then raise exception 'bad_site'; end if;
+  if exists (select 1 from public.scans where id = p->>'id') then return jsonb_build_object('status','added','id',p->>'id'); end if;
   select * into ex from public.scans where job_id = p_job and asset_norm = n and dir = v_dir and not deleted;
-  if found then
-    update public.scans set
-      neu   = coalesce(nullif(neu,''),   nullif(p->>'neu','')),
-      etage = coalesce(nullif(etage,''), nullif(p->>'etage','')),
-      raum  = coalesce(nullif(raum,''),  nullif(p->>'raum','')),
-      buero = coalesce(nullif(buero,''), nullif(p->>'buero','')),
-      place = coalesce(nullif(place,''), nullif(p->>'place','')),
-      note  = coalesce(nullif(note,''),  nullif(p->>'note','')),
-      cond  = case when coalesce(cond,'ok') = 'ok' and coalesce(p->>'cond','ok') <> 'ok' then p->>'cond' else cond end,
-      updated_at = now()
-    where id = ex.id;
-    return jsonb_build_object('status','dup','id',ex.id,'by',ex."by");
-  end if;
-  if exists (select 1 from public.scans where id = p->>'id') then
-    return jsonb_build_object('status','added','id',p->>'id');
-  end if;
-  insert into public.scans(id, job_id, site_id, dir, art, grp, asset, neu, etage, raum, buero, place, cond, note, "by", user_id, ts)
-  values (p->>'id', p_job, v_site, v_dir, case when p->>'art' = 'tausch' then 'tausch' else 'einzeln' end, nullif(p->>'grp',''), p->>'asset', p->>'neu', p->>'etage', p->>'raum', p->>'buero', p->>'place',
-          coalesce(p->>'cond','ok'), p->>'note', public.mr_me(), auth.uid(), (p->>'ts')::bigint);
+  if found then return jsonb_build_object('status','dup','id',ex.id,'by',ex."by"); end if;
+  pl := public.mr_check_plan(p_job, v_site, p->>'pos_id', v_dir, n, null);
+  insert into public.scans(id, job_id, site_id, pos_id, dir, art, grp, asset, etage, raum, buero, place, wo, cond, note, "by", user_id, ts)
+  values (p->>'id', p_job, v_site, p->>'pos_id', v_dir, case when p->>'art' = 'tausch' then 'tausch' else 'einzeln' end, nullif(p->>'grp',''), p->>'asset',
+          pl->>'etage', pl->>'raum', pl->>'buero', pl->>'place', pl->>'wo', coalesce(nullif(p->>'cond',''),'ok'), nullif(p->>'note',''), public.mr_me(), auth.uid(), (p->>'ts')::bigint);
   update public.jobs set status = 'aktiv', updated_at = now() where id = p_job and status = 'geplant';
   return jsonb_build_object('status','added','id',p->>'id');
 end $$;
@@ -129,30 +174,26 @@ end $$;
 -- Eintrag bearbeiten: Lead, Dispatcher oder wer ihn erfasst hat
 create or replace function public.scan_update(p_job uuid, p jsonb) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
-declare ex public.scans; v_site uuid; n text; k text;
+declare ex public.scans; v_site uuid; v_pos text; n text; pl jsonb;
 begin
   perform public.mr_need_job(p_job, true);
   select * into ex from public.scans where job_id = p_job and id = p->>'id' and not deleted;
   if not found then raise exception 'not_found'; end if;
   if not (ex.user_id = auth.uid() or public.mr_is_lead(p_job)) then raise exception 'not_allowed'; end if;
   v_site := coalesce(nullif(p->>'site_id','')::uuid, ex.site_id);
-  if not exists (select 1 from public.sites where id = v_site and job_id = p_job) then raise exception 'bad_site'; end if;
+  v_pos := coalesce(nullif(p->>'pos_id',''), ex.pos_id);
   n := upper(regexp_replace(coalesce(nullif(p->>'asset',''), ex.asset), '\s', '', 'g'));
   if exists (select 1 from public.scans where job_id = p_job and asset_norm = n and dir = ex.dir and not deleted and id <> ex.id) then raise exception 'dup_asset'; end if;
-  perform public.mr_check_loc(p_job, jsonb_build_object('etage', coalesce(p->>'etage', ex.etage), 'raum', coalesce(p->>'raum', ex.raum), 'buero', coalesce(p->>'buero', ex.buero), 'place', coalesce(p->>'place', ex.place)));
-  update public.scans set
-    asset = coalesce(nullif(trim(p->>'asset'),''), asset), site_id = v_site,
-    etage = case when p ? 'etage' then nullif(trim(p->>'etage'),'') else etage end,
-    raum  = case when p ? 'raum'  then nullif(trim(p->>'raum'),'')  else raum end,
-    buero = case when p ? 'buero' then nullif(trim(p->>'buero'),'') else buero end,
-    place = case when p ? 'place' then nullif(trim(p->>'place'),'') else place end,
-    cond  = case when p ? 'cond'  then coalesce(nullif(p->>'cond',''),'ok') else cond end,
-    note  = case when p ? 'note'  then nullif(trim(p->>'note'),'') else note end,
-    updated_at = now()
+  pl := public.mr_check_plan(p_job, v_site, v_pos, ex.dir, n, ex.id);
+  update public.scans set asset = coalesce(nullif(trim(p->>'asset'),''), asset), site_id = v_site, pos_id = v_pos,
+    etage = pl->>'etage', raum = pl->>'raum', buero = pl->>'buero', place = pl->>'place', wo = pl->>'wo',
+    cond = case when p ? 'cond' then coalesce(nullif(p->>'cond',''),'ok') else cond end,
+    note = case when p ? 'note' then nullif(trim(p->>'note'),'') else note end, updated_at = now()
   where id = ex.id;
   return jsonb_build_object('status','updated','id',ex.id);
 end $$;
 
-revoke all on function public.mr_check_loc(uuid,jsonb) from public, anon, authenticated;
+revoke all on function public.mr_check_plan(uuid,uuid,text,text,text,text) from public, anon, authenticated;
 revoke all on function public.scan_update(uuid,jsonb) from public, anon;
 grant execute on function public.scan_update(uuid,jsonb) to authenticated;
+grant execute on function public.mr_devtype(text) to authenticated;
