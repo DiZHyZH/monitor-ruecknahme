@@ -86,6 +86,15 @@
   <div class="scangrid">
     <div class="col">
       <section class="card scancard dir-ab" id="scanCard">
+        <div class="locbox" id="locBox">
+          <div class="lochead"><b>📍 Wo bist du?</b><small id="locReqTxt"></small></div>
+          <div class="row4">
+            <div class="fld"><label for="lEtage">Etage<span class="req" data-req="etage" hidden> ✱</span></label><input id="lEtage" type="text" placeholder="2. OG"></div>
+            <div class="fld"><label for="lRaum">Raum<span class="req" data-req="raum" hidden> ✱</span></label><input id="lRaum" type="text" placeholder="214"></div>
+            <div class="fld"><label for="lBuero">Bezeichnung<span class="req" data-req="buero" hidden> ✱</span></label><input id="lBuero" type="text" placeholder="Einkauf"></div>
+            <div class="fld"><label for="lPlatz">Arbeitsplatz<span class="req" data-req="place" hidden> ✱</span></label><input id="lPlatz" type="text" placeholder="14"></div>
+          </div>
+        </div>
         <div class="dirseg" id="dirSeg" role="group" aria-label="Art der Arbeit">
           <button type="button" data-v="tausch" aria-pressed="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 8h14l-4-4M20 16H6l4 4"/></svg>Austausch</button>
           <button type="button" data-v="auf" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 20V6M6 12l6-6 6 6"/></svg>Aufbau</button>
@@ -108,21 +117,15 @@
         <div id="scanMsg" class="msg" aria-live="polite">Bereit. Handscanner oder Kamera.</div>
         <div id="picks" class="picks" hidden></div>
         <details class="det" id="detBox">
-          <summary>Details zum Gerät <small id="detSum"></small></summary>
-          <div class="row3">
-            <div class="fld"><label for="dEtage">Etage</label><input id="dEtage" type="text" placeholder="2. OG"></div>
-            <div class="fld"><label for="dRaum">Raum</label><input id="dRaum" type="text" placeholder="214"></div>
-            <div class="fld"><label for="dBuero">Büro</label><input id="dBuero" type="text" placeholder="Einkauf"></div>
-          </div>
-          <div class="fld"><label for="dPlatz">Arbeitsplatz</label><input id="dPlatz" type="text" placeholder="14"></div>
+          <summary>Zustand &amp; Notiz <small id="detSum"></small></summary>
           <div class="fld"><label>Zustand</label><div class="chips" id="dCond"><button type="button" data-v="ok" aria-pressed="true">OK</button><button type="button" data-v="gebraucht" aria-pressed="false">Gebrauchsspuren</button><button type="button" data-v="defekt" aria-pressed="false">Defekt</button></div></div>
           <div class="fld"><label for="dNote">Notiz</label><input id="dNote" type="text" placeholder="z. B. ohne Fuss"></div>
-          <p class="hint">Etage, Raum und Büro bleiben stehen. Arbeitsplatz, Zustand und Notiz gelten für den nächsten Vorgang und werden danach geleert.</p>
+          <p class="hint">Gilt für das nächste Gerät und wird danach zurückgesetzt.</p>
         </details>
       </section>
       <section class="card matcard">
         <h2>Material verbraucht <small id="matSum"></small></h2>
-        <p class="hint">Gilt für den gewählten Standort. Etage und Raum kommen aus den Details.</p>
+        <p class="hint">Gilt für den gewählten Standort. Etage und Raum kommen aus «Wo bist du?».</p>
         <div id="matList" class="matlist"></div>
         <form id="matFree" class="scanrow" autocomplete="off"><input id="matFreeIn" type="text" placeholder="Anderes Material, z. B. USB-C 1 m"><button class="btn" type="submit">+ Hinzufügen</button></form>
       </section>
@@ -132,7 +135,7 @@
       <section class="card listcard">
         <div class="listhead"><h2>Erfasst <small id="listCount"></small></h2>
           <div class="seg2 small" role="group"><button type="button" id="lsSite" aria-pressed="true">Dieser Standort</button><button type="button" id="lsAll" aria-pressed="false">Alle</button></div></div>
-        <div class="tablewrap"><table class="tbl"><thead><tr><th>#</th><th>Asset-ID</th><th>Typ</th><th>Art</th><th class="hide-s">Ort</th><th class="hide-s">Von</th><th></th></tr></thead><tbody id="scanRows"></tbody></table></div>
+        <div class="tablewrap"><table class="tbl"><thead><tr><th>#</th><th>Asset-ID</th><th class="hide-s">Typ</th><th class="hide-s">Art</th><th class="hide-s">Von</th><th></th></tr></thead><tbody id="scanRows"></tbody></table></div>
         <div id="scanEmpty" class="empty">Noch nichts erfasst an diesem Standort.</div>
       </section>
     </div>
@@ -159,6 +162,15 @@
       <div class="row2">
         <div class="fld"><label for="fLead">Lead vor Ort <span class="req">✱</span></label><select id="fLead"></select></div>
         <div class="fld"><label for="fTausch">Austausch alt : neu</label><select id="fTausch"><option value="1:1">1 : 1 (Normalfall)</option><option value="2:1">2 : 1 (z. B. 2 Monitore → 1 Ultrawide)</option><option value="1:2">1 : 2</option><option value="frei">frei, vor Ort entscheiden</option></select></div>
+      </div>
+      <div class="fld"><span class="l">Beim Erfassen Pflicht</span>
+        <div class="checkrow" id="fLocReq">
+          <label><input type="checkbox" data-k="etage" checked> Etage</label>
+          <label><input type="checkbox" data-k="raum" checked> Raum</label>
+          <label><input type="checkbox" data-k="buero" checked> Bezeichnung</label>
+          <label><input type="checkbox" data-k="place"> Arbeitsplatz</label>
+        </div>
+        <div class="hint" style="margin:0">Angehakte Felder müssen vor jedem Scan ausgefüllt sein. Ohne sie lässt die App keinen Scan zu.</div>
       </div>
       <div class="codeprev">Auftragscode: <b id="fCode">–</b></div>
     </section>

@@ -115,7 +115,8 @@ function errText(e) {
     invite_invalid: "Die Einladung ist ungültig oder abgelaufen. Den Lead um einen neuen QR-Code bitten.",
     site_has_data: "Dieser Standort hat schon Einträge und kann nicht entfernt werden.", rollout_one_site: "Ein Rollout hat genau einen Standort. Für mehrere: Tour wählen.",
     "past:datum": "Das Datum liegt in der Vergangenheit.", cannot_demote_self: "Du kannst dir die Admin-Rolle nicht selbst wegnehmen.",
-    not_allowed: "Nur eigene Einträge löschen, oder der Lead.", bad_site: "Standort fehlt."
+    not_allowed: "Nur eigene Einträge, oder der Lead.", bad_site: "Standort fehlt.", dup_asset: "Diese Asset-ID ist schon erfasst.",
+    "missing_loc:etage": "Etage fehlt (Pflicht).", "missing_loc:raum": "Raum fehlt (Pflicht).", "missing_loc:buero": "Bezeichnung fehlt (Pflicht).", "missing_loc:place": "Arbeitsplatz fehlt (Pflicht)."
   };
   for (const k in map) if (m.includes(k)) return map[k];
   if (/missing:/.test(m)) return "Pflichtfeld fehlt (" + m.split("missing:")[1] + ").";
@@ -197,10 +198,12 @@ async function sync() {
           } else if (d.scans[q.item.id]) delete d.scans[q.item.id].pending;
           saveJd(q.job); changed = true;
         } else if (q.op === "scandel") await rpc("scan_delete", { p_job: q.job, p_id: q.id });
+        else if (q.op === "scanupd") await rpc("scan_update", { p_job: q.job, p: q.item });
         else if (q.op === "mat") await rpc("mat_set", { p_job: q.job, p: q.item });
       } catch (e) {
         if (isNet(e) || e.auth) throw e;
         if (q.op === "scan") { const d = jd(q.job); delete d.scans[q.item.id]; saveJd(q.job); changed = true; }
+        if (q.op === "scanupd") { const d = jd(q.job); d.sinceS = "1970-01-01T00:00:00Z"; saveJd(q.job); }
         toast("Nicht gespeichert: " + errText(e)); beepBad();
       }
       queue.shift(); ls.set("queue", queue);
@@ -426,6 +429,7 @@ function renderJob() {
   row("Datum", fmtDate(j.datum)); row("Zeit", j.zeit_von + " – " + j.zeit_bis); row("Art", j.art === "tour" ? "Tour · " + j.sites.length + " Standorte" : "Rollout");
   if (j.wo) row("WO / INC", j.wo);
   row("Austausch", (j.tausch || "1:1").replace(":", " : ") + (j.tausch === "frei" ? "" : " (alt : neu)"));
+  { const n = LOCF.filter(([k]) => (j.loc_req || {})[k]).map(([, , l]) => l); row("Ort-Pflicht", n.length ? n.join(", ") : "keine"); }
   row("Lead", j.lead_name || "–"); row("Team", j.members && j.members.length ? j.members.join(", ") : "noch niemand eingeladen");
   const b = $("jBtns"); b.innerHTML = "";
   const closed = j.status === "abgeschlossen";
@@ -536,7 +540,7 @@ function renderScan(first) {
   if (first || sel.options.length !== j.sites.length) {
     sel.innerHTML = ""; j.sites.forEach((s, i) => sel.append(h("option", { value: s.id }, (j.sites.length > 1 ? (i + 1) + ". " : "") + siteLabel(s))));
     const last = ls.get("site:" + j.id, null); siteId = j.sites.some(s => s.id === last) ? last : (j.sites[0] && j.sites[0].id); sel.value = siteId;
-    const dt = ls.get("det:" + j.id, {}); $("dEtage").value = dt.etage || ""; $("dRaum").value = dt.raum || ""; $("dBuero").value = dt.buero || "";
+    const dt = ls.get("det:" + j.id, {}); $("lEtage").value = dt.etage || ""; $("lRaum").value = dt.raum || ""; $("lBuero").value = dt.buero || ""; $("lPlatz").value = dt.place || "";
     swap = ls.get("swap:" + j.id, null);
     const sa = sollOf(j, null, "auf"), sb = sollOf(j, null, "ab");
     const def = ls.get("mode:" + j.id, null) || (Object.keys(sa).length && Object.keys(sb).length ? "tausch" : Object.keys(sa).length ? "auf" : "ab");
@@ -554,7 +558,7 @@ function renderScan(first) {
   $("progSite").textContent = j.sites.length > 1 ? "· Standort " + (j.sites.indexOf(s) + 1) : "";
   $("sProgress").innerHTML = ""; $("sProgress").append(progressEl(j, listAll ? null : siteId));
   renderSwap(); renderMat(j); renderRows(j);
-  $("detSum").textContent = [$("dEtage").value, $("dRaum").value && "Raum " + $("dRaum").value, $("dBuero").value].filter(Boolean).join(" · ");
+  renderLocReq(j); updDetSum();
   if (first && matchMedia("(pointer:fine)").matches && !closed) setTimeout(() => $("scanIn").focus(), 50);
 }
 $("siteSel").addEventListener("change", e => { siteId = e.target.value; ls.set("site:" + cur, siteId); swap = null; saveSwap(); renderScan(false); setMsg("Standort gewechselt. Bereit.", ""); refocus(); });
@@ -576,12 +580,15 @@ function renderRows(j) {
       armed = null; removeScan(j, s);
     } }, armed === s.id ? "Sicher?" : "Löschen") : "";
     const extra = [s.cond && s.cond !== "ok" ? (s.cond === "defekt" ? "Defekt" : "Spuren") : "", s.note].filter(Boolean).join(" · ");
-    const ort = [listAll && j.sites.length > 1 ? "S" + siteNo(s.site_id) : "", s.etage, s.raum && "R " + s.raum, s.place && "P " + s.place].filter(Boolean).join(" · ");
+    const ort = [listAll && j.sites.length > 1 ? "Standort " + siteNo(s.site_id) : "", locText(s)].filter(Boolean).join(" · ");
     const artTag = s.art === "tausch" ? "Tausch " + (swapNo[s.grp] || "") + (d === "ab" ? " ↓" : " ↑") : (d === "ab" ? "Abbau" : "Aufbau");
-    tb.append(h("tr", { class: (s.id === freshId ? "fresh " : "") + (s.pending ? "pending" : "") },
-      h("td", { class: "n" }, String(total - i)), h("td", { class: "a" }, s.asset, extra ? h("small", null, extra) : null),
-      h("td", null, h("span", { class: "tag" + (ty ? "" : " unk") }, ty || "Unbekannt")), h("td", null, h("span", { class: "tag " + d }, artTag)),
-      h("td", { class: "o hide-s" }, ort), h("td", { class: "b hide-s" }, (s.by || "").split(" ")[0]), h("td", null, del)));
+    const ed = canEdit(j, s) ? () => editScan(j, s) : null;
+    tb.append(h("tr", { class: (s.id === freshId ? "fresh " : "") + (s.pending ? "pending " : "") + (ed ? "click" : ""), title: ed ? "Antippen zum Bearbeiten" : null },
+      h("td", { class: "n", onclick: ed }, String(total - i)), h("td", { class: "a", onclick: ed }, s.asset,
+        h("span", { class: "show-s tags" }, h("span", { class: "tag" + (ty ? "" : " unk") }, ty || "Unbekannt"), h("span", { class: "tag " + d }, artTag)),
+        ort ? h("span", { class: "loc" }, "📍 " + ort) : h("span", { class: "loc", style: "color:var(--muted);font-weight:500" }, "📍 kein Ort"), extra ? h("small", null, extra) : null),
+      h("td", { class: "hide-s" }, h("span", { class: "tag" + (ty ? "" : " unk") }, ty || "Unbekannt")), h("td", { class: "hide-s" }, h("span", { class: "tag " + d }, artTag)),
+      h("td", { class: "b hide-s" }, (s.by || "").split(" ")[0]), h("td", null, del)));
   });
 }
 function removeScan(j, s) {
@@ -592,15 +599,60 @@ function removeScan(j, s) {
   if (swap && s.grp === swap.grp && !swapsOf(j.id).some(g => g.grp === swap.grp)) { swap = null; saveSwap(); }
   renderScan(false); toast("Gelöscht: " + s.asset);
 }
-function details() { return { etage: $("dEtage").value.trim(), raum: $("dRaum").value.trim(), buero: $("dBuero").value.trim(), place: $("dPlatz").value.trim(), cond, note: $("dNote").value.trim() }; }
-["dEtage", "dRaum", "dBuero"].forEach(id => $(id).addEventListener("input", () => { ls.set("det:" + cur, { etage: $("dEtage").value, raum: $("dRaum").value, buero: $("dBuero").value }); $("detSum").textContent = [$("dEtage").value, $("dRaum").value && "Raum " + $("dRaum").value, $("dBuero").value].filter(Boolean).join(" · "); }));
-document.querySelectorAll("#dCond button").forEach(b => b.onclick = () => { cond = b.dataset.v; document.querySelectorAll("#dCond button").forEach(x => x.setAttribute("aria-pressed", x === b)); });
-function clearTransient() { $("dPlatz").value = ""; $("dNote").value = ""; cond = "ok"; document.querySelectorAll("#dCond button").forEach(x => x.setAttribute("aria-pressed", x.dataset.v === "ok")); }
+const LOCF = [["etage", "lEtage", "Etage"], ["raum", "lRaum", "Raum"], ["buero", "lBuero", "Bezeichnung"], ["place", "lPlatz", "Arbeitsplatz"]];
+const locReq = j => (j && j.loc_req) || {};
+function renderLocReq(j) {
+  const r = locReq(j); document.querySelectorAll("[data-req]").forEach(x => x.hidden = !r[x.dataset.req]);
+  const names = LOCF.filter(([k]) => r[k]).map(([, , l]) => l);
+  $("locReqTxt").textContent = names.length ? "Pflicht: " + names.join(", ") : "freiwillig";
+}
+function missingLoc(j) { const r = locReq(j); return LOCF.filter(([k, id]) => r[k] && !$(id).value.trim()); }
+function locText(s) { return [s.etage, s.raum && "Raum " + s.raum, s.buero, s.place && "Platz " + s.place].filter(Boolean).join(" · "); }
+function details() { return { etage: $("lEtage").value.trim(), raum: $("lRaum").value.trim(), buero: $("lBuero").value.trim(), place: $("lPlatz").value.trim(), cond, note: $("dNote").value.trim() }; }
+function updDetSum() { $("detSum").textContent = [cond !== "ok" ? (cond === "defekt" ? "Defekt" : "Gebrauchsspuren") : "", $("dNote").value.trim()].filter(Boolean).join(" · "); }
+LOCF.forEach(([, id]) => $(id).addEventListener("input", () => { $(id).classList.remove("invalid"); ls.set("det:" + cur, { etage: $("lEtage").value, raum: $("lRaum").value, buero: $("lBuero").value, place: $("lPlatz").value }); }));
+LOCF.forEach(([, id]) => $(id).addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); const j = jobById(cur); const m = j && missingLoc(j)[0]; if (m) $(m[1]).focus(); else { setMsg("📍 " + (locText(details()) || "Ort gesetzt") + ". Jetzt scannen.", ""); $("scanIn").focus(); } } }));
+$("dNote").addEventListener("input", updDetSum);
+document.querySelectorAll("#dCond button").forEach(b => b.onclick = () => { cond = b.dataset.v; document.querySelectorAll("#dCond button").forEach(x => x.setAttribute("aria-pressed", x === b)); updDetSum(); });
+function clearTransient() { $("lPlatz").value = ""; ls.set("det:" + cur, { etage: $("lEtage").value, raum: $("lRaum").value, buero: $("lBuero").value, place: "" }); $("dNote").value = ""; cond = "ok"; document.querySelectorAll("#dCond button").forEach(x => x.setAttribute("aria-pressed", x.dataset.v === "ok")); updDetSum(); }
+
+/* Eintrag bearbeiten */
+function canEdit(j, s) { return j.status !== "abgeschlossen" && (s.user_id === me.id || isLead(j)); }
+function editScan(j, s) {
+  if (!canEdit(j, s)) return toast("Bearbeiten darf der Lead, der Dispatcher oder wer den Eintrag erfasst hat.");
+  const r = locReq(j);
+  const f = (k, label, v, attrs) => h("div", { class: "fld" + (attrs && attrs.full ? " full" : "") }, h("label", { for: "e_" + k }, label, r[k] ? h("span", { class: "req" }, " ✱") : null), h("input", { id: "e_" + k, type: "text", value: v || "", ...(attrs && attrs.mono ? { class: "mono" } : {}) }));
+  let ec = s.cond || "ok";
+  const condBox = h("div", { class: "chips full" }, [["ok", "OK"], ["gebraucht", "Gebrauchsspuren"], ["defekt", "Defekt"]].map(([v, l]) => h("button", { type: "button", "data-v": v, "aria-pressed": String(ec === v), onclick: e => { ec = v; condBox.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === v)); } }, l)));
+  const siteSel = j.sites.length > 1 ? h("div", { class: "fld full" }, h("label", { for: "e_site" }, "Standort"), h("select", { id: "e_site" }, j.sites.map((x, i) => h("option", { value: x.id, selected: x.id === s.site_id }, (i + 1) + ". " + siteLabel(x))))) : null;
+  const body = h("div", { class: "editgrid" },
+    h("div", { class: "full hint", style: "margin:0" }, (dirOf(s) === "ab" ? "Abbau" : "Aufbau") + (s.art === "tausch" ? " · Austausch" : "") + " · erfasst von " + (s.by || "?") + ", " + fmtTs(s.ts)),
+    f("asset", "Asset-ID", s.asset, { full: true, mono: true }), siteSel,
+    f("etage", "Etage", s.etage), f("raum", "Raum", s.raum), f("buero", "Bezeichnung", s.buero), f("place", "Arbeitsplatz", s.place),
+    h("div", { class: "fld full" }, h("label", null, "Zustand"), condBox), f("note", "Notiz", s.note, { full: true }));
+  ask("Eintrag bearbeiten", body, [{ label: "Abbrechen" }, { label: "Speichern", cls: "primary", fn: () => {
+    const v = k => (($("e_" + k) || {}).value || "").trim();
+    const upd = { id: s.id, asset: clean(v("asset")), site_id: $("e_site") ? $("e_site").value : s.site_id, etage: v("etage"), raum: v("raum"), buero: v("buero"), place: v("place"), cond: ec, note: v("note") };
+    const miss = LOCF.filter(([k]) => r[k] && !upd[k]).map(([, , l]) => l);
+    if (!upd.asset || upd.asset.length < 4) return toast("Asset-ID fehlt oder ist zu kurz");
+    if (miss.length) { toast("Pflicht: " + miss.join(", ")); beepBad(); return setTimeout(() => editScan(j, { ...s, ...upd }), 50); }
+    if (Object.values(jd(j.id).scans).some(x => x.id !== s.id && dirOf(x) === dirOf(s) && norm(x.asset) === norm(upd.asset))) { toast(upd.asset + " ist schon erfasst"); beepBad(); return; }
+    const d = jd(j.id), rec = d.scans[s.id]; if (!rec) return;
+    Object.assign(rec, upd); ["etage", "raum", "buero", "place", "note"].forEach(k => { if (!rec[k]) delete rec[k]; }); if (rec.cond === "ok") delete rec.cond;
+    saveJd(j.id);
+    const qi = queue.findIndex(q => q.op === "scan" && q.item.id === s.id);
+    if (qi >= 0) { Object.assign(queue[qi].item, upd); ls.set("queue", queue); kick(); } else enqueue({ op: "scanupd", job: j.id, item: upd });
+    renderScan(false); toast("Gespeichert: " + upd.asset); beepOk();
+  } }]);
+}
+
 function addAsset(raw) {
   const j = jobById(cur); if (!j || j.status === "abgeschlossen") return false;
   const a = clean(raw); if (!a) return false;
   if (!siteId) { setMsg("Zuerst Standort wählen.", "bad"); beepBad(); return false; }
   if (a.length < 4) { setMsg("«" + a + "» ist zu kurz für eine Asset-ID.", "bad"); beepBad(); return false; }
+  const ml = missingLoc(j);
+  if (ml.length) { ml.forEach(([, id]) => $(id).classList.add("invalid")); setMsg("Zuerst ausfüllen: " + ml.map(([, , l]) => l).join(", ") + ". Dann nochmals scannen.", "bad"); beepBad(); $(ml[0][1]).focus(); return false; }
   // Richtung bestimmen
   let dir = mode === "auf" ? "auf" : "ab", grp = null, art = "einzeln", step = null;
   if (mode === "tausch") {
@@ -748,6 +800,7 @@ async function openForm(id) {
   setArt(j ? j.art : "rollout");
   $("fKunde").value = j ? j.kunde : ""; $("fWo").value = j ? (j.wo || "") : "";
   $("fDatum").value = j ? j.datum : ""; $("fDatum").min = j ? "" : today(); $("fTausch").value = j ? (j.tausch || "1:1") : "1:1";
+  { const r = j ? (j.loc_req || {}) : { etage: true, raum: true, buero: true, place: false }; document.querySelectorAll("#fLocReq input").forEach(x => x.checked = !!r[x.dataset.k]); }
   $("fVon").value = j ? j.zeit_von : ""; $("fBis").value = j ? j.zeit_bis : ""; $("fNotes").value = j ? (j.notes || "") : "";
   fSites = j ? j.sites.map(s => ({ ...s, soll: { ...s.soll } })) : [blankSite()];
   renderSites(); renderFormMat(j); updCode();
@@ -821,7 +874,8 @@ $("jobForm").addEventListener("submit", async e => {
   const days = (Date.parse(d) - Date.parse(today())) / 864e5;
   if (days > 60 && !e.submitter?.dataset.ok) return ask("Datum prüfen", "Der Auftrag ist am " + fmtDate(d) + ", also in " + Math.round(days) + " Tagen. Stimmt das?", [{ label: "Korrigieren", fn: () => $("fDatum").focus() }, { label: "Ja, stimmt", cls: "primary", fn: () => { $("fGo").dataset.ok = 1; $("fGo").click(); delete $("fGo").dataset.ok; } }]);
   const material = [...document.querySelectorAll("[data-mat]")].map(x => ({ name: x.dataset.mat, qty: parseInt(x.value) || 0 })).filter(m => m.qty > 0);
-  const p = { id: formJob || undefined, art: fArt, tausch: $("fTausch").value, kunde: $("fKunde").value.trim(), datum: d, zeit_von: $("fVon").value, zeit_bis: $("fBis").value, wo: $("fWo").value.trim(), lead: $("fLead").value,
+  const loc_req = {}; document.querySelectorAll("#fLocReq input").forEach(x => loc_req[x.dataset.k] = x.checked);
+  const p = { id: formJob || undefined, art: fArt, tausch: $("fTausch").value, loc_req, kunde: $("fKunde").value.trim(), datum: d, zeit_von: $("fVon").value, zeit_bis: $("fBis").value, wo: $("fWo").value.trim(), lead: $("fLead").value,
     material, notes: $("fNotes").value.trim(), sites: fSites.map(s => ({ id: s.id, gebaeude: s.gebaeude, strasse: s.strasse, plz: s.plz, ort: s.ort, kontakt: s.kontakt, telefon: s.telefon, zutritt: s.zutritt, soll: s.soll })) };
   $("fGo").disabled = true; $("fErr").textContent = "Speichere …";
   try {
@@ -882,7 +936,7 @@ async function exportJob(j) {
   XLSX.utils.book_append_sheet(wb, sheet(info, [16, 22, 34, 22, 16, 30]), "Auftrag");
   const sc = scansOf(j.id);
   const sw = swapsOf(j.id), swNo = {}; sw.forEach(g => swNo[g.grp] = g.no);
-  XLSX.utils.book_append_sheet(wb, sheet([["Nr", "Asset-ID", "Gerätetyp", "Richtung", "Art", "Austausch-Nr", "Standort", "Gebäude", "Adresse", "Etage", "Raum", "Büro", "Arbeitsplatz", "Zustand", "Notiz", "Erfasst", "Erfasst durch"],
+  XLSX.utils.book_append_sheet(wb, sheet([["Nr", "Asset-ID", "Gerätetyp", "Richtung", "Art", "Austausch-Nr", "Standort", "Gebäude", "Adresse", "Etage", "Raum", "Bezeichnung", "Arbeitsplatz", "Zustand", "Notiz", "Erfasst", "Erfasst durch"],
     ...sc.map((s, i) => [i + 1, s.asset, devType(s.asset) || "Unbekannt", dirOf(s) === "ab" ? "Abbau" : "Aufbau", s.art === "tausch" ? "Austausch" : "Einzeln", swNo[s.grp] || "", No(s.site_id), S(s.site_id).gebaeude || "", addr(S(s.site_id)), s.etage || "", s.raum || "", s.buero || "", s.place || "", condTxt(s.cond), s.note || "", new Date(s.ts).toLocaleString("de-CH"), s.by || ""])],
     [5, 16, 20, 10, 11, 12, 9, 14, 30, 9, 9, 14, 12, 15, 24, 17, 20]), "Geräte");
   XLSX.utils.book_append_sheet(wb, sheet([["Austausch-Nr", "Alt (Abbau)", "Typ alt", "Neu (Aufbau)", "Typ neu", "Standort", "Adresse", "Etage", "Raum", "Arbeitsplatz", "Erfasst durch"],
@@ -901,7 +955,7 @@ async function exportJob(j) {
 }
 function exportLegacy() {
   const wb = XLSX.utils.book_new();
-  legacyLists().forEach((l, i) => XLSX.utils.book_append_sheet(wb, sheet([["Nr", "Asset-ID", "Gerätetyp", "Ersetzt durch", "Etage", "Raum", "Büro", "Arbeitsplatz", "Zustand", "Notiz", "Erfasst", "Erfasst durch"],
+  legacyLists().forEach((l, i) => XLSX.utils.book_append_sheet(wb, sheet([["Nr", "Asset-ID", "Gerätetyp", "Ersetzt durch", "Etage", "Raum", "Bezeichnung", "Arbeitsplatz", "Zustand", "Notiz", "Erfasst", "Erfasst durch"],
     ...l.items.slice().sort((a, b) => a.ts - b.ts).map((s, k) => [k + 1, s.asset, devType(s.asset) || "Unbekannt", s.neu || "", s.etage || "", s.raum || "", s.buero || "", s.place || "", condTxt(s.cond), s.note || "", new Date(s.ts).toLocaleString("de-CH"), s.by || ""])], [5, 16, 20, 16, 9, 9, 14, 12, 15, 24, 17, 20]),
     (l.name || "Liste " + (i + 1)).replace(/[\\/?*[\]:]/g, "-").slice(0, 28) + (i ? " " + i : "")));
   saveFile(new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "Alte_Listen.xlsx");

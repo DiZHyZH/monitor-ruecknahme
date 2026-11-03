@@ -159,6 +159,21 @@ textarea{resize:vertical}
 .col{display:flex;flex-direction:column;gap:14px;min-width:0}
 @media (max-width:959px){.scangrid{display:flex;flex-direction:column}.scangrid .col{display:contents}.scancard{order:1}.progcard{order:2}.listcard{order:3}.matcard{order:4}}
 .scanrow{display:flex;gap:8px}
+.locbox{background:var(--surface-2);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.lochead{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.lochead small{color:var(--muted);font-size:12.5px}
+.row4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:520px){.row4{grid-template-columns:1fr 1fr}}
+.locbox input{background:var(--surface);padding:10px 11px}
+.locbox .fld label{font-size:11.5px}
+.checkrow{display:flex;flex-wrap:wrap;gap:8px 16px}
+.checkrow label{display:flex;align-items:center;gap:8px;font-size:15px;cursor:pointer}
+.checkrow input{width:20px;height:20px;accent-color:var(--accent)}
+.tbl tr.click td{cursor:pointer}
+.tbl tr.click:hover td{background:var(--surface-2)}
+.tbl td.a .loc{display:block;font-family:var(--f);font-weight:600;color:var(--fg);font-size:12.5px;white-space:normal}
+.editgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.editgrid .full{grid-column:1/-1}
 .dirseg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:var(--surface-2);border-radius:14px;padding:5px}
 .dirseg button{display:flex;align-items:center;justify-content:center;gap:6px;min-height:50px;padding:0 6px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:17px;font-weight:800;cursor:pointer;letter-spacing:-.01em}
 .dirseg button small{font-size:12.5px;font-weight:700;opacity:.8;font-variant-numeric:tabular-nums}
@@ -238,7 +253,9 @@ input.big{font-size:20px;padding:14px 16px}
 .tbl tr.pending td.a::after{content:" ⏳";font-size:12px}
 .tbl .x{border:0;background:none;color:var(--muted);cursor:pointer;font-size:13px;padding:4px 6px;border-radius:6px}
 .tbl .x.arm{color:var(--bad);background:var(--bad-soft);font-weight:700}
-@media (max-width:560px){.hide-s{display:none}}
+.show-s{display:none}
+.tags{gap:4px;flex-wrap:wrap;margin:3px 0 2px;font-family:var(--f)}
+@media (max-width:560px){.hide-s{display:none}.show-s{display:flex}}
 .tag{display:inline-block;font-size:10.5px;font-weight:750;letter-spacing:.04em;text-transform:uppercase;border-radius:6px;padding:2px 6px;color:var(--accent-strong);background:var(--accent-soft);white-space:nowrap}
 .tag.unk{color:var(--bad);background:var(--bad-soft)}
 .tag.gebraucht{color:var(--warn);background:var(--warn-soft)} .tag.defekt{color:var(--bad);background:var(--bad-soft)}

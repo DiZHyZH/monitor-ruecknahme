@@ -101,6 +101,7 @@ a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
       <li><span><b>Rollout</b> für einen Standort, <b>Tour</b> für mehrere Standorte, z. B. 14 Orte mit je 2–3 Geräten.</span></li>
       <li><span>Alle Felder mit <span class="req" style="color:#c0352b">✱</span> ausfüllen: Kunde, Datum, Zeit, Lead und pro Standort Adresse, Ansprechperson, Telefon und <b>Soll-Menge pro Gerätetyp</b>, getrennt nach <b>Abbau (alt)</b> und <b>Aufbau (neu)</b>. Ein Austausch zählt bei beiden, z. B. 2 Monitore ab und 1 Monitor auf.</span></li>
       <li><span><b>Austausch alt : neu</b> vorgeben: 1 : 1 im Normalfall, 2 : 1 bei zwei Monitoren gegen einen Ultrawide.</span></li>
+      <li><span><b>Beim Erfassen Pflicht</b>: anhaken, welche Ortsangaben vor jedem Scan ausgefüllt sein müssen (Etage, Raum, Bezeichnung, Arbeitsplatz).</span></li>
       <li><span>Unter «Mitnehmen» eintragen, was das Team einpacken muss, z. B. Klett und Kabel.</span></li>
       <li><span><span class="ui">Auftrag freigeben</span>. Fehlt etwas, zeigt die App rot, was noch fehlt. Der Auftragscode wird automatisch gebildet, z. B. <code>HWLC_VBZ_2026_11_04</code>.</span></li>
     </ol>
@@ -130,7 +131,9 @@ a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
       <li><b>Laptop mit Handscanner:</b> Einfach scannen. Das Scanfeld ist immer bereit, ein kurzer Piep heisst gespeichert. Ein tiefer Doppelton heisst: schon erfasst, unbekannter Gerätetyp oder mehr als geplant. Die Meldung steht dann farbig im Feld.</li>
       <li><b>Handy:</b> <span class="ui">Kamera</span> für ein Foto vom Label oder <span class="ui">Galerie</span> für mehrere Fotos auf einmal.</li>
       <li><b>Gerätetyp</b> wird an der Asset-ID erkannt: <code>42000…</code> Monitor, <code>22000…</code> Thin Client/Tower, <code>32000…</code> Laptop, <code>62000…</code> Docking HP, <code>72000…</code> Docking Lenovo.</li>
-      <li><b>Details zum Gerät:</b> Etage, Raum und Büro bleiben stehen. Arbeitsplatz, «Ersetzt durch», Zustand und Notiz gelten nur fürs nächste Gerät.</li>
+      <li><b>📍 Wo bist du?</b> Oben Etage, Raum, Bezeichnung und Arbeitsplatz eintragen, <b>bevor</b> du scannst. Was der Dispatcher als Pflicht markiert hat (✱), muss ausgefüllt sein, sonst nimmt die App den Scan nicht an. Etage, Raum und Bezeichnung bleiben stehen, der Arbeitsplatz wird nach jedem Gerät geleert.</li>
+      <li><b>Zustand &amp; Notiz</b> gelten nur fürs nächste Gerät.</li>
+      <li><b>Fehler korrigieren:</b> In der Liste einen Eintrag antippen und Raum, Bezeichnung, Platz, Zustand, Notiz oder die Asset-ID ändern. Das darf, wer ihn erfasst hat, der Lead und der Dispatcher.</li>
       <li><b>Material verbraucht:</b> Antippen, was du eingebaut hast, z. B. «+ HDMI 2 m». Etage und Raum kommen automatisch aus den Details. Das ist verrechenbar, also bitte nicht vergessen.</li>
       <li><b>Fortschritt</b> zeigt Ist / Soll pro Gerätetyp. In der Liste löschst du eigene Einträge mit <span class="ui">Löschen</span> und dann <span class="ui">Sicher?</span>.</li>
     </ul>
