@@ -1082,9 +1082,29 @@ async function exportJob(j) {
   const wb = XLSX.utils.book_new(), S = id => j.sites.find(s => s.id === id) || {}, No = id => j.sites.findIndex(s => s.id === id) + 1;
   const info = [["Auftrag", j.code], ["Kunde", j.kunde], ["Datum", fmtDate(j.datum)], ["Zeit", j.zeit_von + " – " + j.zeit_bis], ["WO / INC", j.wo || ""], ["Lead", j.lead_name || ""], ["Team", (j.members || []).join(", ")], ["Status", j.status], [],
     ["Nr", "Gebäude", "Adresse", "Ansprechperson", "Telefon", "Zutritt"], ...j.sites.map((s, i) => [i + 1, s.gebaeude || "", addr(s), s.kontakt, s.telefon, s.zutritt || ""])];
-  XLSX.utils.book_append_sheet(wb, sheet(info, [16, 22, 34, 22, 16, 30]), "Auftrag");
   const sc = scansOf(j.id);
   const sw = swapsOf(j.id), swNo = {}; sw.forEach(g => swNo[g.grp] = g.no);
+  // Blatt 1: Übersicht pro Raum – was wurde wo erledigt
+  const nat = (a, b) => String(a || "").localeCompare(String(b || ""), "de", { numeric: true });
+  const rooms = new Map();
+  sc.forEach(x => { const k = [No(x.site_id), x.etage || "", x.raum || "", x.buero || ""].join("|");
+    const r = rooms.get(k) || { site: No(x.site_id), etage: x.etage || "", raum: x.raum || "", buero: x.buero || "", places: new Set(), ab: {}, auf: {}, pairs: [], by: new Set(), first: x.ts, last: x.ts };
+    const t = devType(x.asset) || "Unbekannt", d = dirOf(x); r[d][t] = (r[d][t] || 0) + 1; if (x.place) r.places.add(x.place); r.by.add(x.by); r.first = Math.min(r.first, x.ts); r.last = Math.max(r.last, x.ts); rooms.set(k, r); });
+  sw.forEach(g => { const f = g.alt[0] || g.neu[0]; if (!f) return; const k = [No(f.site_id), f.etage || "", f.raum || "", f.buero || ""].join("|"); const r = rooms.get(k); if (r) r.pairs.push(g.alt.map(x => x.asset).join("+") + " → " + (g.neu.map(x => x.asset).join("+") || "?")); });
+  const cnt = o => Object.entries(o).map(([t, n]) => n + " " + t).join(", ");
+  const rr = [...rooms.values()].sort((a, b) => a.site - b.site || nat(a.etage, b.etage) || nat(a.raum, b.raum) || nat(a.buero, b.buero));
+  const hm = t => new Date(t).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
+  const top = [["Auftrag", j.code, "", "Kunde", j.kunde], ["Datum", fmtDate(j.datum), "", "Adresse", j.sites.map(addr).join(" / ")], ["Erfasst total", sc.filter(x => dirOf(x) === "ab").length + " abgebaut, " + sc.filter(x => dirOf(x) === "auf").length + " aufgebaut", "", "Räume", rr.length], [],
+    ["Standort", "Etage", "Raum", "Bezeichnung", "Arbeitsplätze", "Abgebaut (alt)", "Aufgebaut (neu)", "Anzahl alt", "Anzahl neu", "Austausch alt → neu", "Zeit", "Erfasst durch"]];
+  rr.forEach(r => { const na = Object.values(r.ab).reduce((a, b) => a + b, 0), nn = Object.values(r.auf).reduce((a, b) => a + b, 0);
+    top.push([r.site, r.etage, r.raum, r.buero, [...r.places].sort(nat).join(", "), cnt(r.ab), cnt(r.auf), na, nn, r.pairs.join("\n"), hm(r.first) + "–" + hm(r.last), [...r.by].join(", ")]); });
+  if (rr.length) top.push(["Total", "", "", "", "", "", "", sc.filter(x => dirOf(x) === "ab").length, sc.filter(x => dirOf(x) === "auf").length]);
+  const wsR = XLSX.utils.aoa_to_sheet(top); wsR["!cols"] = [9, 9, 9, 30, 14, 18, 18, 10, 10, 50, 12, 24].map(w => ({ wch: w }));
+  if (rr.length) wsR["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 4, c: 0 }, e: { r: 4 + rr.length, c: 11 } }) };
+  XLSX.utils.book_append_sheet(wb, wsR, "Räume");
+  XLSX.utils.book_append_sheet(wb, sheet([["Austausch-Nr", "Alt (Abbau)", "Typ alt", "Neu (Aufbau)", "Typ neu", "Standort", "Adresse", "Etage", "Raum", "Bezeichnung", "Arbeitsplatz", "Erfasst durch"],
+    ...sw.map(g => { const f = g.alt[0] || g.neu[0] || {}; return [g.no, g.alt.map(x => x.asset).join(", "), [...new Set(g.alt.map(x => devType(x.asset) || "Unbekannt"))].join(", "), g.neu.map(x => x.asset).join(", "), [...new Set(g.neu.map(x => devType(x.asset) || "Unbekannt"))].join(", "), No(g.site_id), addr(S(g.site_id)), f.etage || "", f.raum || "", f.buero || "", f.place || "", [...new Set([...g.alt, ...g.neu].map(x => x.by))].join(", ")]; })],
+    [12, 28, 18, 28, 18, 9, 30, 9, 9, 28, 12, 20]), "Austausch");
   XLSX.utils.book_append_sheet(wb, sheet([["Nr", "Asset-ID", "Gerätetyp", "Richtung", "Art", "Austausch-Nr", "Standort", "Gebäude", "Adresse", "Etage", "Raum", "Bezeichnung", "Arbeitsplatz", "WO / INC", "Zustand", "Notiz", "Erfasst", "Erfasst durch"],
     ...sc.map((s, i) => [i + 1, s.asset, devType(s.asset) || "Unbekannt", dirOf(s) === "ab" ? "Abbau" : "Aufbau", s.art === "tausch" ? "Austausch" : "Einzeln", swNo[s.grp] || "", No(s.site_id), S(s.site_id).gebaeude || "", addr(S(s.site_id)), s.etage || "", s.raum || "", s.buero || "", s.place || "", s.wo || "", condTxt(s.cond), s.note || "", new Date(s.ts).toLocaleString("de-CH"), s.by || ""])],
     [5, 16, 20, 10, 11, 12, 9, 14, 30, 9, 9, 14, 12, 14, 15, 24, 17, 20]), "Geräte");
@@ -1093,9 +1113,7 @@ async function exportJob(j) {
     types.forEach(t => { const sa = posPlanned(p, "ab", t), sn = posPlanned(p, "auf", t), ia = posCount(j.id, p.id, "ab", t), iu = posCount(j.id, p.id, "auf", t);
       pr.push([si + 1, addr(j.sites[si] || {}), p.etage, p.raum, p.buero || "", p.place || "", p.wo || "", posArtTxt(p), t, sa, ia, sn, iu, ia >= sa && iu >= sn ? "fertig" : ia + iu ? "angefangen" : "offen"]); }); });
   XLSX.utils.book_append_sheet(wb, sheet(pr, [9, 30, 9, 9, 16, 12, 14, 14, 20, 8, 8, 8, 8, 11]), "Plätze");
-  XLSX.utils.book_append_sheet(wb, sheet([["Austausch-Nr", "Alt (Abbau)", "Typ alt", "Neu (Aufbau)", "Typ neu", "Standort", "Adresse", "Etage", "Raum", "Arbeitsplatz", "Erfasst durch"],
-    ...sw.map(g => { const f = g.alt[0] || g.neu[0] || {}; return [g.no, g.alt.map(x => x.asset).join(", "), [...new Set(g.alt.map(x => devType(x.asset) || "Unbekannt"))].join(", "), g.neu.map(x => x.asset).join(", "), [...new Set(g.neu.map(x => devType(x.asset) || "Unbekannt"))].join(", "), No(g.site_id), addr(S(g.site_id)), f.etage || "", f.raum || "", f.place || "", [...new Set([...g.alt, ...g.neu].map(x => x.by))].join(", ")]; })],
-    [12, 28, 18, 28, 18, 9, 30, 9, 9, 12, 20]), "Austausch");
+
   const si = [["Standort", "Gebäude", "Adresse", "Richtung", "Gerätetyp", "Soll", "Ist", "Differenz"]];
   j.sites.forEach((s, i) => DIRS.forEach(([d, l]) => { const ist = counts(j.id, s.id, d), soll = sollOf(j, s.id, d); [...new Set([...Object.keys(soll), ...Object.keys(ist)])].forEach(k => si.push([i + 1, s.gebaeude || "", addr(s), l, k, soll[k] || 0, ist[k] || 0, (ist[k] || 0) - (soll[k] || 0)])); }));
   XLSX.utils.book_append_sheet(wb, sheet(si, [9, 14, 30, 10, 20, 7, 7, 10]), "Soll-Ist");
@@ -1105,6 +1123,7 @@ async function exportJob(j) {
   const tt = [["Standort", "Adresse", "Material", "Total"], ...Object.entries(tot).map(([k, q]) => { const [n, it] = k.split("|"); return [+n, addr(j.sites[n - 1] || {}), it, q]; })];
   const all = {}; ms.forEach(m => all[m.item] = (all[m.item] || 0) + m.qty); if (ms.length) { tt.push([]); tt.push(["", "", "Total Auftrag", ""]); Object.entries(all).forEach(([it, q]) => tt.push(["", "", it, q])); }
   XLSX.utils.book_append_sheet(wb, sheet(tt, [9, 34, 22, 8]), "Material Total");
+  XLSX.utils.book_append_sheet(wb, sheet(info, [16, 22, 34, 22, 16, 30]), "Auftrag");
   saveFile(new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), j.code + ".xlsx");
 }
 function exportLegacy() {
