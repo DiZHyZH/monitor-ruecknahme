@@ -125,7 +125,7 @@ function errText(e) {
     site_has_data: "Dieser Standort hat schon Einträge und kann nicht entfernt werden.", rollout_one_site: "Ein Rollout hat genau einen Standort. Für mehrere: Tour wählen.",
     "past:datum": "Das Datum liegt in der Vergangenheit.", cannot_demote_self: "Du kannst dir die Admin-Rolle nicht selbst wegnehmen.",
     not_allowed: "Nur eigene Einträge, oder der Lead.", bad_site: "Standort fehlt.", dup_asset: "Diese Asset-ID ist schon erfasst.",
-    bad_pos: "Platz fehlt oder ist nicht mehr im Plan.", unknown_type: "Unbekannter Gerätetyp, nicht im Plan.", wrong_art: "An diesem Platz ist diese Arbeit nicht geplant.",
+    bad_pos: "Platz fehlt oder ist nicht mehr im Plan.", code_taken: "Diesen Namen gibt es schon als geplanten Auftrag.", "missing:kuerzel": "Kürzel fehlt.", "missing:ort": "Ort fehlt.", bad_asset: "Ungültige Asset-ID.", unknown_type: "Unbekannter Gerätetyp, nicht im Plan.", wrong_art: "An diesem Platz ist diese Arbeit nicht geplant.",
     "not_planned:": "Dieser Gerätetyp ist an diesem Platz nicht geplant.", "over_plan:": "Mehr als geplant. An diesem Platz ist nichts mehr offen.", pos_has_data: "Ein Platz mit Einträgen kann nicht entfernt werden.",
     "missing:plaetze": "Jeder Standort braucht mindestens einen Platz.", "missing:platz_ort": "Bei einem Platz fehlen Etage oder Raum.", "missing:platz_ab": "Bei einem Platz fehlt die Anzahl alter Geräte.", "missing:platz_auf": "Bei einem Platz fehlt die Anzahl neuer Geräte.",
     "missing_loc:etage": "Etage fehlt (Pflicht).", "missing_loc:raum": "Raum fehlt (Pflicht).", "missing_loc:buero": "Bezeichnung fehlt (Pflicht).", "missing_loc:place": "Arbeitsplatz fehlt (Pflicht)."
@@ -396,7 +396,28 @@ function jobCard(j) {
       h("span", null, "👤 Lead: " + (j.lead_name || "–")), j.wo ? h("span", null, "🧾 " + j.wo) : null),
     h("div", { class: "jp" }, h("div", { class: "bar" + (p.s && p.i >= p.s ? " done" : "") }, h("i", { style: "width:" + (p.s ? Math.min(100, p.i / p.s * 100) : 0) + "%" })), h("b", null, p.i + " / " + p.s + " Geräte")));
 }
-$("newJob").onclick = () => go("#new"); $("usersBtn").onclick = () => go("#users"); $("catBtn").onclick = () => go("#cat");
+$("newJob").onclick = () => go("#new");
+$("quickJob").onclick = () => {
+  const last = ls.get("quick", {});
+  let art = last.art || "auf";
+  const d = new Date(), ds = d.getFullYear() + "." + String(d.getMonth() + 1).padStart(2, "0") + "." + String(d.getDate()).padStart(2, "0");
+  const prev = h("div", { class: "codeprev" }, "Name: ", h("b", { id: "qCode" }, "–"));
+  const upd = () => { const k = $("qK").value.trim().toUpperCase().replace(/[^A-Z0-9ÄÖÜ-]+/g, ""), o = $("qO").value.trim().replace(/\s+/g, "_"); $("qCode").textContent = k && o ? k + "_" + o + "_" + ds : "KÜRZEL_Ort_" + ds; };
+  const seg = h("div", { class: "seg3" }, [["auf", "Aufbau"], ["ab", "Abbau"], ["tausch", "Austausch"]].map(([v, l]) => h("button", { type: "button", "data-v": v, "aria-pressed": String(art === v), onclick: e => { art = v; seg.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === v)); } }, l)));
+  const body = h("div", { class: "editgrid" },
+    h("div", { class: "full hint", style: "margin:0" }, "Ohne Planung, sofort loslegen. Kollegen, die am gleichen Tag denselben Namen starten, landen in derselben Liste."),
+    h("div", { class: "fld" }, h("label", { for: "qK" }, "Kürzel / Gebäude"), h("input", { id: "qK", type: "text", value: last.k || "", placeholder: "HWLC", autocapitalize: "characters", oninput: upd })),
+    h("div", { class: "fld" }, h("label", { for: "qO" }, "Ort"), h("input", { id: "qO", type: "text", value: last.o || "", placeholder: "Zürich", oninput: upd })),
+    h("div", { class: "fld full" }, h("label", null, "Arbeit"), seg), h("div", { class: "full" }, prev));
+  ask("Einfache Liste", body, [{ label: "Abbrechen" }, { label: "Starten", cls: "primary", fn: async () => {
+    const k = $("qK").value.trim(), o = $("qO").value.trim();
+    if (k.length < 2 || o.length < 2) { toast("Kürzel und Ort ausfüllen"); beepBad(); return setTimeout(() => $("quickJob").click(), 50); }
+    ls.set("quick", { k, o, art });
+    try { const j = await rpc("job_quick", { p: { kuerzel: k, ort: o, art } }); await refreshJobs(); toast(j.code); go("#scan/" + j.id); }
+    catch (e) { ask("Geht nicht", errText(e), [{ label: "OK", cls: "primary" }]); }
+  } }]);
+  setTimeout(() => { upd(); $(last.k ? "qO" : "qK").focus(); }, 30);
+}; $("usersBtn").onclick = () => go("#users"); $("catBtn").onclick = () => go("#cat");
 
 /* ---------- Einladung ---------- */
 async function acceptInvite(token) {
@@ -449,7 +470,7 @@ function renderJob() {
   b.append(h("button", { class: "btn", type: "button", onclick: () => exportJob(j) }, "Excel"));
   if (isLead(j) && !closed) b.append(h("button", { class: "btn dark", type: "button", onclick: () => finishJob(j) }, "Abschliessen"));
   if (isDisp()) {
-    b.append(h("button", { class: "btn", type: "button", onclick: () => go("#edit/" + j.id) }, "Bearbeiten"));
+    if (!j.simple) b.append(h("button", { class: "btn", type: "button", onclick: () => go("#edit/" + j.id) }, "Bearbeiten"));
     if (closed) b.append(h("button", { class: "btn", type: "button", onclick: () => setStatus(j, "aktiv") }, "Wieder öffnen"));
     if (!scansOf(j.id).length && !j.scan_count) b.append(h("button", { class: "btn danger", type: "button", onclick: () => ask("Auftrag löschen?", j.code + " wird endgültig gelöscht.", [{ label: "Abbrechen" }, { label: "Löschen", cls: "danger", fn: async () => { try { await rpc("job_delete", { p_job: j.id }); toast("Gelöscht"); await refreshJobs(); go("#"); } catch (e) { toast(errText(e)); } } }]) }, "Löschen"));
   }
@@ -462,8 +483,8 @@ function renderJob() {
     sb.append(h("div", { class: "site" },
       h("div", { class: "sh" }, h("span", { class: "no" }, String(i + 1)), h("div", { class: "sa" }, h("b", null, s.gebaeude || addr(s)), s.gebaeude ? h("span", null, addr(s)) : null), h("b", { style: "font-variant-numeric:tabular-nums" }, sumI + " / " + sumS)),
       h("div", { class: "line" }, h("a", { href: maps, target: "_blank", rel: "noopener" }, "🗺️ Karte öffnen"),
-        h("span", null, "👤 " + s.kontakt), h("a", { href: "tel:" + s.telefon.replace(/[^\d+]/g, "") }, "📞 " + s.telefon),
-        h("button", { class: "btn link", type: "button", style: "min-height:0;padding:0", onclick: () => { navigator.clipboard && navigator.clipboard.writeText(s.telefon).then(() => toast("Nummer kopiert")).catch(() => {}); } }, "kopieren")),
+        s.kontakt ? h("span", null, "👤 " + s.kontakt) : null, s.telefon ? h("a", { href: "tel:" + s.telefon.replace(/[^\d+]/g, "") }, "📞 " + s.telefon) : null,
+        s.telefon && h("button", { class: "btn link", type: "button", style: "min-height:0;padding:0", onclick: () => { navigator.clipboard && navigator.clipboard.writeText(s.telefon).then(() => toast("Nummer kopiert")).catch(() => {}); } }, "kopieren")),
       s.zutritt ? h("div", { class: "zut" }, "🔑 " + s.zutritt) : null,
       (s.plaetze || []).length ? h("div", { class: "plist" }, s.plaetze.map(p => { const st = posState(j, p), t = posTotals(j, p); return h("div", { class: "prow2" }, h("div", null, h("b", null, (st === "done" ? "✅ " : st === "part" ? "🟡 " : "⚪ ") + posLabel(p)), h("small", null, posArtTxt(p) + " · " + posSollTxt(p) + (p.wo ? " · " + p.wo : ""))), h("b", { style: "font-variant-numeric:tabular-nums" }, t.i + "/" + t.s)); })) : h("div", { class: "err", style: "min-height:0" }, "Noch keine Plätze geplant."),
       h("div", { class: "hint", style: "margin:0" }, "Soll: " + (DIRS.map(([d, l]) => { const x = Object.entries(sollSite(s, d)).map(([k, v]) => v + " " + k).join(", "); return x ? l + " " + x : ""; }).filter(Boolean).join(" · ") || "–"))));
@@ -508,11 +529,12 @@ function posArtTxt(p) { return (p.frei ? "📍 vor Ort · " : "") + ART_TXT[p.ar
 function posCount(jobId, pid, dir, type, ignore) { return scansOf(jobId).filter(s => s.pos_id === pid && dirOf(s) === dir && s.id !== ignore && (!type || devType(s.asset) === type)).length; }
 function posPlanned(p, dir, type) { return parseInt(((p.soll || {})[dir] || {})[type]) || 0; }
 function posTotals(j, p) { let s = 0, i = 0; ["ab", "auf"].forEach(d => Object.entries((p.soll || {})[d] || {}).forEach(([t, n]) => { s += +n; i += Math.min(+n, posCount(j.id, p.id, d, t)); })); return { s, i }; }
-function posState(j, p) { const t = posTotals(j, p); return t.i === 0 ? "open" : t.i >= t.s ? "done" : "part"; }
+function posState(j, p) { if (j.simple) return posTotals(j, p).i ? "part" : "open"; const t = posTotals(j, p); return t.i === 0 ? "open" : t.i >= t.s ? "done" : "part"; }
 // prüft wie die Datenbank: richtiger Platz, Typ geplant, Menge nicht überschritten → Fehlertext oder ""
 function planError(j, p, dir, asset, ignore) {
   const t = devType(asset);
   if (!p) return "Zuerst einen Platz wählen.";
+  if (j.simple) return (p.art === "auf" && dir !== "auf") || (p.art === "ab" && dir !== "ab") ? "In dieser Liste ist nur " + ART_TXT[p.art] + " vorgesehen." : "";
   if (!t) return "Unbekannter Gerätetyp. Diese Asset-ID gehört nicht zum Plan.";
   if ((p.art === "auf" && dir !== "auf") || (p.art === "ab" && dir !== "ab")) return "An diesem Platz ist nur " + ART_TXT[p.art] + " geplant.";
   const pl = posPlanned(p, dir, t);
@@ -530,11 +552,12 @@ function swapsOf(jobId) {
 }
 function curSwap(j) { return swap && swap.pos === posId && swapsOf(j.id).find(g => g.grp === swap.grp); }
 function saveSwap() { ls.set("swap:" + cur, swap); }
-function remainingDir(j, p, d) { return Object.entries((p.soll || {})[d] || {}).reduce((a, [t, n]) => a + Math.max(0, +n - posCount(j.id, p.id, d, t)), 0); }
+function remainingDir(j, p, d) { if (j.simple) return 1e9; return Object.entries((p.soll || {})[d] || {}).reduce((a, [t, n]) => a + Math.max(0, +n - posCount(j.id, p.id, d, t)), 0); }
 function nextStep(j) {
   const p = posById(j, posId); if (!p || p.art !== "tausch") return null;
   const g = curSwap(j), r = RATIO(p.tausch), ra = remainingDir(j, p, "ab"), rn = remainingDir(j, p, "auf");
   if (swap && swap.force && g) return swap.force;
+  if (j.simple && !(swap && swap.force)) return !g || g.neu.length ? "alt" : "neu";
   if (!g || (g.neu.length >= r.neu && g.alt.length >= r.alt) || (g.neu.length && !rn)) return ra ? "alt" : (rn ? "neu" : "done");
   if (!g.neu.length && g.alt.length < r.alt && ra) return "alt";
   if (g.neu.length < r.neu && rn) return "neu";
@@ -560,7 +583,7 @@ function renderPos(j) {
   else {
     const t = posTotals(j, cur0), st = posState(j, cur0);
     box.className = "poscur";
-    box.append(h("div", { class: "pt" }, cur0.frei ? (cur0.buero || "Ganzer Standort") + " · Ort vor Ort erfassen" : posLabel(cur0)),
+    box.append(h("div", { class: "pt" }, j.simple ? "Einfache Liste · " + ART_TXT[cur0.art] : cur0.frei ? (cur0.buero || "Ganzer Standort") + " · Ort vor Ort erfassen" : posLabel(cur0)),
       h("div", { class: "pm" }, h("span", { class: "tag " + (cur0.art === "tausch" ? "" : cur0.art) }, posArtTxt(cur0)), cur0.wo ? h("span", { class: "tag" }, cur0.wo) : null,
         h("span", null, (st === "done" ? "✓ fertig · " : "") + t.i + " / " + t.s + " Geräte"),
         h("span", null, DIRS.map(([d, l]) => { const x = Object.entries((cur0.soll || {})[d] || {}).map(([k, n]) => posCount(j.id, cur0.id, d, k) + "/" + n + " " + k).join(", "); return x ? l + ": " + x : ""; }).filter(Boolean).join(" · "))));
@@ -608,7 +631,7 @@ function renderScan(first) {
   $("siteSelF").hidden = j.sites.length < 2;
   const s = j.sites.find(x => x.id === siteId) || j.sites[0];
   const sa = $("siteAddr"); sa.innerHTML = "";
-  if (s) sa.append(...[h("b", null, siteLabel(s)), h("br"), "👤 " + s.kontakt + " · 📞 " + s.telefon, s.zutritt ? " · 🔑 " + s.zutritt : ""].filter(Boolean));
+  if (s) sa.append(...[h("b", null, j.simple ? j.code : siteLabel(s)), s.kontakt || s.telefon ? h("br") : "", s.kontakt ? "👤 " + s.kontakt : "", s.telefon ? " · 📞 " + s.telefon : "", s.zutritt ? " · 🔑 " + s.zutritt : ""].filter(Boolean));
   const p = posById(j, posId); if (p) mode = p.art;
   $("scanCard").className = "card scancard dir-" + (p ? p.art : "tausch");
   const closed = j.status === "abgeschlossen";
@@ -759,7 +782,7 @@ function addAsset(raw) {
   const lbl = p.art === "tausch" ? (dir === "ab" ? "Alt" : "Neu") : ART_TXT[p.art];
   let follow = "";
   if (p.art === "tausch") { const nx = nextStep(j); follow = nx === "alt" ? " → ALTES scannen" : nx === "neu" ? " → jetzt NEUES scannen" : ""; }
-  setMsg("✓ " + lbl + ": " + a + " · " + ty + " · " + ist + "/" + soll + follow, "ok"); beepOk();
+  setMsg("✓ " + lbl + ": " + a + " · " + (ty || "Unbekannter Typ") + " · " + (j.simple ? ist + " erfasst" : ist + "/" + soll) + follow, "ok"); beepOk();
   if (posState(j, p) === "done") {
     const nx = firstOpenPos(j, p.site_id, p.id);
     if (nx) { setPos(j, nx.id, true); setMsg("✓ " + a + " · Platz fertig! Weiter mit: " + posLabel(nx) + " · " + posArtTxt(nx), "ok"); }
