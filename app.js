@@ -1084,24 +1084,34 @@ async function exportJob(j) {
     ["Nr", "Gebäude", "Adresse", "Ansprechperson", "Telefon", "Zutritt"], ...j.sites.map((s, i) => [i + 1, s.gebaeude || "", addr(s), s.kontakt, s.telefon, s.zutritt || ""])];
   const sc = scansOf(j.id);
   const sw = swapsOf(j.id), swNo = {}; sw.forEach(g => swNo[g.grp] = g.no);
-  // Blatt 1: Übersicht pro Raum – was wurde wo erledigt
+  // Blatt 1: pro Raum jeder Austausch in einer Zeile, Alt und Neu in eigenen Spalten
   const nat = (a, b) => String(a || "").localeCompare(String(b || ""), "de", { numeric: true });
-  const rooms = new Map();
-  sc.forEach(x => { const k = [No(x.site_id), x.etage || "", x.raum || "", x.buero || ""].join("|");
-    const r = rooms.get(k) || { site: No(x.site_id), etage: x.etage || "", raum: x.raum || "", buero: x.buero || "", places: new Set(), ab: {}, auf: {}, pairs: [], by: new Set(), first: x.ts, last: x.ts };
-    const t = devType(x.asset) || "Unbekannt", d = dirOf(x); r[d][t] = (r[d][t] || 0) + 1; if (x.place) r.places.add(x.place); r.by.add(x.by); r.first = Math.min(r.first, x.ts); r.last = Math.max(r.last, x.ts); rooms.set(k, r); });
-  sw.forEach(g => { const f = g.alt[0] || g.neu[0]; if (!f) return; const k = [No(f.site_id), f.etage || "", f.raum || "", f.buero || ""].join("|"); const r = rooms.get(k); if (r) r.pairs.push(g.alt.map(x => x.asset).join("+") + " → " + (g.neu.map(x => x.asset).join("+") || "?")); });
-  const cnt = o => Object.entries(o).map(([t, n]) => n + " " + t).join(", ");
-  const rr = [...rooms.values()].sort((a, b) => a.site - b.site || nat(a.etage, b.etage) || nat(a.raum, b.raum) || nat(a.buero, b.buero));
   const hm = t => new Date(t).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
-  const top = [["Auftrag", j.code, "", "Kunde", j.kunde], ["Datum", fmtDate(j.datum), "", "Adresse", j.sites.map(addr).join(" / ")], ["Erfasst total", sc.filter(x => dirOf(x) === "ab").length + " abgebaut, " + sc.filter(x => dirOf(x) === "auf").length + " aufgebaut", "", "Räume", rr.length], [],
-    ["Standort", "Etage", "Raum", "Bezeichnung", "Arbeitsplätze", "Abgebaut (alt)", "Aufgebaut (neu)", "Anzahl alt", "Anzahl neu", "Austausch alt → neu", "Zeit", "Erfasst durch"]];
-  rr.forEach(r => { const na = Object.values(r.ab).reduce((a, b) => a + b, 0), nn = Object.values(r.auf).reduce((a, b) => a + b, 0);
-    top.push([r.site, r.etage, r.raum, r.buero, [...r.places].sort(nat).join(", "), cnt(r.ab), cnt(r.auf), na, nn, r.pairs.join("\n"), hm(r.first) + "–" + hm(r.last), [...r.by].join(", ")]); });
-  if (rr.length) top.push(["Total", "", "", "", "", "", "", sc.filter(x => dirOf(x) === "ab").length, sc.filter(x => dirOf(x) === "auf").length]);
-  const wsR = XLSX.utils.aoa_to_sheet(top); wsR["!cols"] = [9, 9, 9, 30, 14, 18, 18, 10, 10, 50, 12, 24].map(w => ({ wch: w }));
-  if (rr.length) wsR["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 4, c: 0 }, e: { r: 4 + rr.length, c: 11 } }) };
+  const rk = x => [No(x.site_id), x.etage || "", x.raum || "", x.buero || ""];
+  const lines = [];
+  sw.forEach(g => { const n = Math.max(g.alt.length, g.neu.length); for (let i = 0; i < n; i++) { const a = g.alt[i], u = g.neu[i], f = a || u;
+    lines.push({ k: rk(f), place: f.place || "", no: g.no, a, u, ts: f.ts, by: [...new Set([a && a.by, u && u.by].filter(Boolean))].join(", ") }); } });
+  sc.filter(x => x.art !== "tausch" || !x.grp).forEach(x => lines.push({ k: rk(x), place: x.place || "", no: "", a: dirOf(x) === "ab" ? x : null, u: dirOf(x) === "auf" ? x : null, ts: x.ts, by: x.by || "" }));
+  lines.sort((p, q) => p.k[0] - q.k[0] || nat(p.k[1], q.k[1]) || nat(p.k[2], q.k[2]) || nat(p.k[3], q.k[3]) || p.ts - q.ts);
+  const nAb = sc.filter(x => dirOf(x) === "ab").length, nAuf = sc.filter(x => dirOf(x) === "auf").length;
+  const nRooms = new Set(lines.map(l => l.k.join("|"))).size;
+  const top = [["Auftrag", j.code, "", "Kunde", j.kunde], ["Datum", fmtDate(j.datum), "", "Adresse", j.sites.map(addr).join(" / ")], ["Erfasst total", nAb + " abgebaut, " + nAuf + " aufgebaut", "", "Räume", nRooms], [],
+    ["Standort", "Etage", "Raum", "Bezeichnung", "Arbeitsplatz", "Austausch-Nr", "Alt (Asset-ID)", "Typ alt", "Neu (Asset-ID)", "Typ neu", "Zustand alt", "Notiz", "Zeit", "Erfasst durch"]];
+  lines.forEach(l => top.push([l.k[0], l.k[1], l.k[2], l.k[3], l.place, l.no, l.a ? l.a.asset : "", l.a ? devType(l.a.asset) || "Unbekannt" : "", l.u ? l.u.asset : "", l.u ? devType(l.u.asset) || "Unbekannt" : "",
+    l.a ? condTxt(l.a.cond) : "", [l.a && l.a.note, l.u && l.u.note].filter(Boolean).join(" / "), hm(l.ts), l.by]));
+  const wsR = XLSX.utils.aoa_to_sheet(top); wsR["!cols"] = [9, 9, 9, 30, 12, 12, 16, 12, 16, 12, 14, 24, 8, 22].map(w => ({ wch: w }));
+  if (lines.length) wsR["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 4, c: 0 }, e: { r: 4 + lines.length, c: 13 } }) };
   XLSX.utils.book_append_sheet(wb, wsR, "Räume");
+  // Blatt 2: Zusammenfassung pro Raum
+  const rooms = new Map();
+  sc.forEach(x => { const k = rk(x).join("|"); const r = rooms.get(k) || { k: rk(x), places: new Set(), ab: {}, auf: {}, by: new Set(), first: x.ts, last: x.ts };
+    const t = devType(x.asset) || "Unbekannt"; r[dirOf(x)][t] = (r[dirOf(x)][t] || 0) + 1; if (x.place) r.places.add(x.place); r.by.add(x.by); r.first = Math.min(r.first, x.ts); r.last = Math.max(r.last, x.ts); rooms.set(k, r); });
+  const cnt = o => Object.entries(o).map(([t, n]) => n + " " + t).join(", ");
+  const rs = [["Standort", "Etage", "Raum", "Bezeichnung", "Arbeitsplätze", "Abgebaut (alt)", "Aufgebaut (neu)", "Anzahl alt", "Anzahl neu", "Zeit", "Erfasst durch"]];
+  [...rooms.values()].sort((a, b) => a.k[0] - b.k[0] || nat(a.k[1], b.k[1]) || nat(a.k[2], b.k[2]) || nat(a.k[3], b.k[3])).forEach(r => rs.push([r.k[0], r.k[1], r.k[2], r.k[3], [...r.places].sort(nat).join(", "), cnt(r.ab), cnt(r.auf),
+    Object.values(r.ab).reduce((a, b) => a + b, 0), Object.values(r.auf).reduce((a, b) => a + b, 0), hm(r.first) + "–" + hm(r.last), [...r.by].join(", ")]));
+  if (rooms.size) rs.push(["Total", "", "", "", "", "", "", nAb, nAuf]);
+  XLSX.utils.book_append_sheet(wb, sheet(rs, [9, 9, 9, 30, 14, 18, 18, 10, 10, 12, 24]), "Räume Summe");
   XLSX.utils.book_append_sheet(wb, sheet([["Austausch-Nr", "Alt (Abbau)", "Typ alt", "Neu (Aufbau)", "Typ neu", "Standort", "Adresse", "Etage", "Raum", "Bezeichnung", "Arbeitsplatz", "Erfasst durch"],
     ...sw.map(g => { const f = g.alt[0] || g.neu[0] || {}; return [g.no, g.alt.map(x => x.asset).join(", "), [...new Set(g.alt.map(x => devType(x.asset) || "Unbekannt"))].join(", "), g.neu.map(x => x.asset).join(", "), [...new Set(g.neu.map(x => devType(x.asset) || "Unbekannt"))].join(", "), No(g.site_id), addr(S(g.site_id)), f.etage || "", f.raum || "", f.buero || "", f.place || "", [...new Set([...g.alt, ...g.neu].map(x => x.by))].join(", ")]; })],
     [12, 28, 18, 28, 18, 9, 30, 9, 9, 28, 12, 20]), "Austausch");
