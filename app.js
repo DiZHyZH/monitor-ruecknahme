@@ -1113,6 +1113,16 @@ async function exportJob(j) {
   wsR["!cols"] = pt.cols.map(w => ({ wch: w }));
   if (lines.length) wsR["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 4, c: 0 }, e: { r: 4 + lines.length, c: pt.cols.length - 1 } }) };
   addSheet(wb, wsR, "Räume");
+  // Blatt «Kopieren»: alle Asset-IDs pro Raum in EINER Zelle, damit man sie in ein einzelnes Feld einfügen kann
+  { const by = new Map(); sc.forEach(x => { const k = rk(x).join("|"); const r = by.get(k) || { k: rk(x), ab: [], auf: [] }; r[dirOf(x)].push(x.asset); by.set(k, r); });
+    const list = [...by.values()].sort((a, b) => a.k[0] - b.k[0] || nat(a.k[1], b.k[1]) || nat(a.k[2], b.k[2]) || nat(a.k[3], b.k[3]));
+    const J = a => a.join(", ");
+    const kr = [["Etage", "Raum", "Bezeichnung", "Alt (Asset-IDs)", "Anzahl alt", "Neu (Asset-IDs)", "Anzahl neu"],
+      ...list.map(r => [r.k[1], r.k[2], r.k[3], J(r.ab), r.ab.length || "", J(r.auf), r.auf.length || ""]),
+      [], ["Alle", "", "", J(sc.filter(x => dirOf(x) === "ab").map(x => x.asset)), nAb || "", J(sc.filter(x => dirOf(x) === "auf").map(x => x.asset)), nAuf || ""]];
+    const ws = sheet(kr, [9, 9, 26, 60, 10, 60, 10]); delete ws["!autofilter"];
+    Object.keys(ws).forEach(c => { if (/^[DF]\d+$/.test(c) && ws[c].v) ws[c].s = { alignment: { wrapText: true, vertical: "top" } }; });
+    addSheet(wb, ws, "Kopieren"); }
   // Blatt 2: Zusammenfassung pro Raum
   const rooms = new Map();
   sc.forEach(x => { const k = rk(x).join("|"); const r = rooms.get(k) || { k: rk(x), places: new Set(), ab: {}, auf: {}, by: new Set(), first: x.ts, last: x.ts };
