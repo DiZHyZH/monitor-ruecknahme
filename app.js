@@ -262,7 +262,7 @@ function show(v) {
   $("meBtn").textContent = me ? ((me.name || "?").trim()[0] || "?").toUpperCase() : "?";
   window.scrollTo(0, 0);
 }
-function go(hash) { if (location.hash === hash) route(); else location.hash = hash; }
+function go(hash) { const n = x => (x || "").replace(/^#?/, "#"); if (n(location.hash) === n(hash)) route(); else location.hash = hash; }
 $("backBtn").onclick = () => {
   if (view === "scan" && cur) go("#job/" + cur); else if (view === "form" && formJob) go("#job/" + formJob); else go("#");
 };
