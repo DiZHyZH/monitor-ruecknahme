@@ -494,8 +494,8 @@ const plaetzeOf = (j, sid) => ((j.sites.find(x => x.id === sid) || {}).plaetze) 
 const allPlaetze = j => j.sites.flatMap(si => (si.plaetze || []).map(p => ({ ...p, site_id: si.id })));
 const posById = (j, id) => allPlaetze(j).find(p => p.id === id);
 function locText(s) { return [s.etage, s.raum && "Raum " + s.raum, s.buero, s.place && "Platz " + s.place].filter(Boolean).join(" · "); }
-function posLabel(p) { return locText(p) || "Platz"; }
-function posArtTxt(p) { return ART_TXT[p.art] + (p.art === "tausch" ? " " + (p.tausch || "1:1").replace(":", ":") : ""); }
+function posLabel(p) { return p.frei ? (p.buero || "Ort vor Ort erfassen") : (locText(p) || "Platz"); }
+function posArtTxt(p) { return (p.frei ? "📍 vor Ort · " : "") + ART_TXT[p.art] + (p.art === "tausch" ? " " + (p.tausch || "1:1").replace(":", ":") : ""); }
 function posCount(jobId, pid, dir, type, ignore) { return scansOf(jobId).filter(s => s.pos_id === pid && dirOf(s) === dir && s.id !== ignore && (!type || devType(s.asset) === type)).length; }
 function posPlanned(p, dir, type) { return parseInt(((p.soll || {})[dir] || {})[type]) || 0; }
 function posTotals(j, p) { let s = 0, i = 0; ["ab", "auf"].forEach(d => Object.entries((p.soll || {})[d] || {}).forEach(([t, n]) => { s += +n; i += Math.min(+n, posCount(j.id, p.id, d, t)); })); return { s, i }; }
@@ -551,7 +551,7 @@ function renderPos(j) {
   else {
     const t = posTotals(j, cur0), st = posState(j, cur0);
     box.className = "poscur";
-    box.append(h("div", { class: "pt" }, posLabel(cur0)),
+    box.append(h("div", { class: "pt" }, cur0.frei ? (cur0.buero || "Ganzer Standort") + " · Ort vor Ort erfassen" : posLabel(cur0)),
       h("div", { class: "pm" }, h("span", { class: "tag " + (cur0.art === "tausch" ? "" : cur0.art) }, posArtTxt(cur0)), cur0.wo ? h("span", { class: "tag" }, cur0.wo) : null,
         h("span", null, (st === "done" ? "✓ fertig · " : "") + t.i + " / " + t.s + " Geräte"),
         h("span", null, DIRS.map(([d, l]) => { const x = Object.entries((cur0.soll || {})[d] || {}).map(([k, n]) => posCount(j.id, cur0.id, d, k) + "/" + n + " " + k).join(", "); return x ? l + ": " + x : ""; }).filter(Boolean).join(" · "))));
@@ -591,6 +591,7 @@ function renderScan(first) {
     sel.innerHTML = ""; j.sites.forEach((s, i) => sel.append(h("option", { value: s.id }, (j.sites.length > 1 ? (i + 1) + ". " : "") + siteLabel(s))));
     const last = ls.get("site:" + j.id, null); siteId = j.sites.some(s => s.id === last) ? last : (j.sites[0] && j.sites[0].id); sel.value = siteId;
     swap = ls.get("swap:" + j.id, null);
+    { const l = ls.get("loc:" + j.id, {}); $("lEtage").value = l.etage || ""; $("lRaum").value = l.raum || ""; $("lBuero").value = l.buero || ""; $("lPlatz").value = l.place || ""; }
     const lp = ls.get("pos:" + j.id, null);
     const p = posById(j, lp) && posById(j, lp).site_id === siteId ? posById(j, lp) : firstOpenPos(j, siteId);
     if (p) setPos(j, p.id, true); else posId = null;
@@ -608,6 +609,7 @@ function renderScan(first) {
   $("progSite").textContent = j.sites.length > 1 ? "· Standort " + (j.sites.indexOf(s) + 1) : "";
   const prog = $("sProgress"); prog.innerHTML = ""; prog.append(progressEl(j, listAll ? null : siteId));
   const pls = listAll ? allPlaetze(j) : plaetzeOf(j, siteId); if (pls.length) prog.append(h("div", { class: "hint", style: "margin:8px 0 0" }, "Plätze fertig: " + pls.filter(x => posState(j, x) === "done").length + " / " + pls.length));
+  $("locBox").hidden = !(p && p.frei);
   renderPos(j); renderSwap(); renderMat(j); renderRows(j); updDetSum();
   if (first && matchMedia("(pointer:fine)").matches && !closed && p) setTimeout(() => $("scanIn").focus(), 50);
 }
@@ -649,7 +651,14 @@ function removeScan(j, s) {
   if (swap && s.grp === swap.grp && !swapsOf(j.id).some(g => g.grp === swap.grp)) { swap = null; saveSwap(); }
   renderScan(false); toast("Gelöscht: " + s.asset);
 }
-function details() { const p = posById(jobById(cur), posId) || {}; return { etage: p.etage || "", raum: p.raum || "", buero: p.buero || "", place: p.place || "", cond, note: $("dNote").value.trim() }; }
+function details() { const p = posById(jobById(cur), posId) || {};
+  if (p.frei) return { etage: $("lEtage").value.trim(), raum: $("lRaum").value.trim(), buero: $("lBuero").value.trim(), place: $("lPlatz").value.trim(), cond, note: $("dNote").value.trim() };
+  return { etage: p.etage || "", raum: p.raum || "", buero: p.buero || "", place: p.place || "", cond, note: $("dNote").value.trim() }; }
+const LOCF = [["etage", "lEtage", "Etage"], ["raum", "lRaum", "Raum"]];
+function missingLoc() { return LOCF.filter(([, id]) => !$(id).value.trim()); }
+function saveLoc() { ls.set("loc:" + cur, { etage: $("lEtage").value, raum: $("lRaum").value, buero: $("lBuero").value, place: $("lPlatz").value }); }
+["lEtage", "lRaum", "lBuero", "lPlatz"].forEach(id => { $(id).addEventListener("input", () => { $(id).classList.remove("invalid"); saveLoc(); });
+  $(id).addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); const m = missingLoc()[0]; if (m) $(m[1]).focus(); else { setMsg("📍 " + locText(details()) + ". Jetzt scannen.", ""); $("scanIn").focus(); } } }); });
 function updDetSum() { $("detSum").textContent = [cond !== "ok" ? (cond === "defekt" ? "Defekt" : "Gebrauchsspuren") : "", $("dNote").value.trim()].filter(Boolean).join(" · "); }
 $("dNote").addEventListener("input", updDetSum);
 document.querySelectorAll("#dCond button").forEach(b => b.onclick = () => { cond = b.dataset.v; document.querySelectorAll("#dCond button").forEach(x => x.setAttribute("aria-pressed", x === b)); updDetSum(); });
@@ -666,16 +675,25 @@ function editScan(j, s) {
     h("div", { class: "full hint", style: "margin:0" }, (dirOf(s) === "ab" ? "Abbau" : "Aufbau") + (s.art === "tausch" ? " · Austausch" : "") + " · erfasst von " + (s.by || "?") + ", " + fmtTs(s.ts)),
     h("div", { class: "fld full" }, h("label", { for: "e_asset" }, "Asset-ID"), h("input", { id: "e_asset", class: "mono", type: "text", value: s.asset })),
     h("div", { class: "fld full" }, h("label", { for: "e_pos" }, "Platz"), h("select", { id: "e_pos" }, opts.map(p => h("option", { value: p.id, selected: p.id === s.pos_id }, (j.sites.length > 1 ? "S" + (j.sites.findIndex(x => x.id === p.site_id) + 1) + " · " : "") + posLabel(p) + " · " + posArtTxt(p))))),
+    h("div", { class: "fld" }, h("label", { for: "e_etage" }, "Etage (nur bei «vor Ort»)"), h("input", { id: "e_etage", type: "text", value: s.etage || "" })),
+    h("div", { class: "fld" }, h("label", { for: "e_raum" }, "Raum"), h("input", { id: "e_raum", type: "text", value: s.raum || "" })),
+    h("div", { class: "fld" }, h("label", { for: "e_buero" }, "Bezeichnung"), h("input", { id: "e_buero", type: "text", value: s.buero || "" })),
+    h("div", { class: "fld" }, h("label", { for: "e_place" }, "Arbeitsplatz"), h("input", { id: "e_place", type: "text", value: s.place || "" })),
     h("div", { class: "fld full" }, h("label", null, "Zustand"), condBox),
     h("div", { class: "fld full" }, h("label", { for: "e_note" }, "Notiz"), h("input", { id: "e_note", type: "text", value: s.note || "" })));
+  const togLoc = () => { const fp = posById(j, $("e_pos").value); ["e_etage", "e_raum", "e_buero", "e_place"].forEach(id => $(id).closest(".fld").hidden = !(fp && fp.frei)); };
+  setTimeout(() => { $("e_pos").addEventListener("change", togLoc); togLoc(); }, 0);
   ask("Eintrag bearbeiten", body, [{ label: "Abbrechen" }, { label: "Speichern", cls: "primary", fn: () => {
     const asset = clean($("e_asset").value), pid = $("e_pos").value, p = posById(j, pid);
     if (!asset || asset.length < 4) { toast("Asset-ID fehlt oder ist zu kurz"); beepBad(); return; }
     if (Object.values(jd(j.id).scans).some(x => x.id !== s.id && dirOf(x) === dirOf(s) && norm(x.asset) === norm(asset))) { toast(asset + " ist schon erfasst"); beepBad(); return; }
     const err = planError(j, p, dirOf(s), asset, s.id); if (err) { ask("Geht so nicht", err, [{ label: "OK", cls: "primary" }]); beepBad(); return; }
     const upd = { id: s.id, asset, site_id: p.site_id, pos_id: p.id, cond: ec, note: $("e_note").value.trim() };
+    let loc = { etage: p.etage, raum: p.raum, buero: p.buero, place: p.place };
+    if (p.frei) { loc = { etage: $("e_etage").value.trim(), raum: $("e_raum").value.trim(), buero: $("e_buero").value.trim(), place: $("e_place").value.trim() };
+      if (!loc.etage || !loc.raum) { toast("Etage und Raum sind Pflicht"); beepBad(); return; } Object.assign(upd, loc); }
     const d = jd(j.id), rec = d.scans[s.id]; if (!rec) return;
-    Object.assign(rec, upd, { etage: p.etage, raum: p.raum, buero: p.buero, place: p.place, wo: p.wo }); ["buero", "place", "note", "wo"].forEach(k => { if (!rec[k]) delete rec[k]; }); if (rec.cond === "ok") delete rec.cond;
+    Object.assign(rec, upd, loc, { wo: p.wo }); ["buero", "place", "note", "wo"].forEach(k => { if (!rec[k]) delete rec[k]; }); if (rec.cond === "ok") delete rec.cond;
     saveJd(j.id);
     const qi = queue.findIndex(q => q.op === "scan" && q.item.id === s.id);
     if (qi >= 0) { Object.assign(queue[qi].item, upd); ls.set("queue", queue); kick(); } else enqueue({ op: "scanupd", job: j.id, item: upd });
@@ -689,6 +707,7 @@ function addAsset(raw) {
   const p = posById(j, posId);
   if (!p) { setMsg("Zuerst einen Platz wählen.", "bad"); beepBad(); posOpen = true; renderPos(j); return false; }
   if (a.length < 4) { setMsg("«" + a + "» ist zu kurz für eine Asset-ID.", "bad"); beepBad(); return false; }
+  if (p.frei) { const ml = missingLoc(); if (ml.length) { ml.forEach(([, id]) => $(id).classList.add("invalid")); setMsg("Zuerst " + ml.map(([, , l]) => l).join(" und ") + " eintragen, dann nochmals scannen.", "bad"); beepBad(); $(ml[0][1]).focus(); return false; } }
   let dir = p.art === "auf" ? "auf" : "ab", grp = null, art = p.art === "tausch" ? "tausch" : "einzeln";
   if (p.art === "tausch") {
     const st = nextStep(j);
@@ -706,12 +725,13 @@ function addAsset(raw) {
   const err = planError(j, p, dir, a);
   if (err) { setMsg(err, "bad"); beepBad(); if (swap && !curSwap(j)) { swap = null; saveSwap(); } return false; }
   const ty = devType(a), dt = details();
-  const rec = { id: uid(), asset: a, site_id: p.site_id, pos_id: p.id, dir, art, etage: p.etage, raum: p.raum, by: me.name, user_id: me.id, ts: Date.now(), pending: true };
-  ["buero", "place", "wo"].forEach(k => { if (p[k]) rec[k] = p[k]; }); if (grp) rec.grp = grp;
+  const rec = { id: uid(), asset: a, site_id: p.site_id, pos_id: p.id, dir, art, etage: dt.etage, raum: dt.raum, by: me.name, user_id: me.id, ts: Date.now(), pending: true };
+  if (dt.buero) rec.buero = dt.buero; if (dt.place) rec.place = dt.place; if (p.wo) rec.wo = p.wo; if (grp) rec.grp = grp;
   if (dt.cond !== "ok") rec.cond = dt.cond; if (dt.note) rec.note = dt.note;
   jd(j.id).scans[rec.id] = rec; saveJd(j.id); enqueue({ op: "scan", job: j.id, item: rec });
   freshId = rec.id; if (swap) { delete swap.force; saveSwap(); }
   clearTransient();
+  if (p.frei && $("lPlatz").value && (p.art !== "tausch" || nextStep(j) !== "neu")) { $("lPlatz").value = ""; saveLoc(); }
   const ist = posCount(j.id, p.id, dir, ty), soll = posPlanned(p, dir, ty);
   const lbl = p.art === "tausch" ? (dir === "ab" ? "Alt" : "Neu") : ART_TXT[p.art];
   let follow = "";
@@ -852,7 +872,7 @@ const blankPos = () => ({ id: uuid(), etage: "", raum: "", buero: "", place: "",
 function posSum(p, d) { return Object.values((p.soll || {})[d] || {}).reduce((a, n) => a + (+n || 0), 0); }
 function posMissing(p) {
   const m = [];
-  if (!(p.etage || "").trim()) m.push(["etage", "Etage"]); if (!(p.raum || "").trim()) m.push(["raum", "Raum"]);
+  if (!p.frei) { if (!(p.etage || "").trim()) m.push(["etage", "Etage"]); if (!(p.raum || "").trim()) m.push(["raum", "Raum"]); }
   if ((p.art === "tausch" || p.art === "ab") && !posSum(p, "ab")) m.push(["ab", "Anzahl alte Geräte (Abbau)"]);
   if ((p.art === "tausch" || p.art === "auf") && !posSum(p, "auf")) m.push(["auf", "Anzahl neue Geräte (Aufbau)"]);
   return m;
@@ -917,10 +937,12 @@ function posEditor(s, i) {
     $("fErr").textContent = ""; renderSites();
     if (andNext) setTimeout(() => { const f = $("pe_place" + i) || $("pe_raum" + i); f && (f.focus(), f.select && f.select()); }, 50);
   };
+  const frei = h("label", { class: "checkrow", style: "font-weight:600" }, h("input", { type: "checkbox", id: "pe_frei" + i, checked: !!p.frei, onchange: e => { p.frei = e.target.checked; renderSites(); } }), " Ort wird vor Ort erfasst (Techniker tragen Etage und Raum selbst ein)");
   return h("div", { class: "posedit" },
-    h("h3", null, isNew ? "Neuer Platz" : "Platz bearbeiten"),
-    h("div", { class: "row2" }, inp("etage", "Etage", true, "2. OG"), inp("raum", "Raum", true, "214")),
-    h("div", { class: "row2" }, inp("buero", "Bezeichnung", false, "Buchhaltung"), inp("place", "Arbeitsplatz", false, "14")),
+    h("h3", null, isNew ? "Neuer Platz" : "Platz bearbeiten"), frei,
+    p.frei ? h("div", { class: "hint", style: "margin:0" }, "Für Aufträge ohne Raumliste: Hier nur die Gesamtmenge angeben, z. B. alle Monitore im Gebäude. Die Bezeichnung ist optional, z. B. «Ganzes Gebäude».") : null,
+    p.frei ? inp("buero", "Bezeichnung", false, "z. B. Ganzes Gebäude") : h("div", { class: "row2" }, inp("etage", "Etage", true, "2. OG"), inp("raum", "Raum", true, "214")),
+    p.frei ? null : h("div", { class: "row2" }, inp("buero", "Bezeichnung", false, "Buchhaltung"), inp("place", "Arbeitsplatz", false, "14")),
     inp("wo", "WO / INC-Nummer", false, "optional", { class: "mono" }),
     h("div", { class: "fld" }, h("span", { class: "l" }, "Arbeit ", h("span", { class: "req" }, "✱")), artSeg), ratio,
     h("div", { class: "fld" }, h("span", { class: "l" }, "Geräte ", h("span", { class: "req" }, "✱")), table),
@@ -1003,7 +1025,7 @@ $("jobForm").addEventListener("submit", async e => {
   const material = [...document.querySelectorAll("[data-mat]")].map(x => ({ name: x.dataset.mat, qty: parseInt(x.value) || 0 })).filter(m => m.qty > 0);
   const p = { id: formJob || undefined, art: fArt, kunde: $("fKunde").value.trim(), datum: d, zeit_von: $("fVon").value, zeit_bis: $("fBis").value, wo: $("fWo").value.trim(), lead: $("fLead").value,
     material, notes: $("fNotes").value.trim(), sites: fSites.map(s => ({ id: s.id, gebaeude: s.gebaeude, strasse: s.strasse, plz: s.plz, ort: s.ort, kontakt: s.kontakt, telefon: s.telefon, zutritt: s.zutritt,
-      plaetze: (s.plaetze || []).map(p => ({ id: p.id, etage: p.etage, raum: p.raum, buero: p.buero, place: p.place, wo: p.wo, art: p.art, tausch: p.tausch, soll: p.soll })) })) };
+      plaetze: (s.plaetze || []).map(p => ({ id: p.id, frei: !!p.frei, etage: p.frei ? "" : p.etage, raum: p.frei ? "" : p.raum, buero: p.buero, place: p.place, wo: p.wo, art: p.art, tausch: p.tausch, soll: p.soll })) })) };
   $("fGo").disabled = true; $("fErr").textContent = "Speichere …";
   try {
     const r = await rpc("job_save", { p }); const i = jobs.findIndex(x => x.id === r.id); if (i >= 0) jobs[i] = r; else jobs.push(r); ls.set("jobs", jobs);
