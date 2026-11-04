@@ -45,9 +45,18 @@ let actx = null;
 function audio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume(); } catch (e) {} return actx; }
 document.addEventListener("pointerdown", audio, { once: true }); document.addEventListener("keydown", audio, { once: true });
 function tone(f, d, at, vol) { const a = audio(); if (!a) return; const o = a.createOscillator(), g = a.createGain(); o.type = "square"; o.frequency.value = f; g.gain.value = vol || .06; o.connect(g); g.connect(a.destination); const t = a.currentTime + (at || 0); o.start(t); o.stop(t + d); }
-const beepOk = () => { tone(1760, .07); vib(40); };
-const beepWarn = () => { tone(440, .12); tone(440, .12, .17); vib([60, 60, 60]); };
-const beepBad = () => { tone(220, .25, 0, .08); vib(200); };
+let bulk = null; // während «Liste einfügen»: keine Einzeltöne/-meldungen
+const beepOk = () => { if (bulk) return; tone(1760, .07); vib(40); };
+const beepWarn = () => { if (bulk) return; tone(440, .12); tone(440, .12, .17); vib([60, 60, 60]); };
+const beepBad = () => { if (bulk) return; tone(220, .25, 0, .08); vib(200); };
+// Etage vereinheitlichen: «4.og», «4 OG», «4. og» → «4. OG»; «eg» → «EG»
+function normEtage(v) {
+  v = (v || "").trim().replace(/\s+/g, " "); let m;
+  if ((m = /^(-?\d+)\s*\.?\s*(og|ug|obergeschoss|untergeschoss)$/i.exec(v))) return m[1] + ". " + (/^u/i.test(m[2]) ? "UG" : "OG");
+  if ((m = /^(eg|ug|dg|og|ag|zg)$/i.exec(v))) return m[1].toUpperCase();
+  if (/^erdgeschoss$/i.test(v)) return "EG";
+  return v;
+}
 function vib(p) { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} }
 
 /* ---------- Toast & Dialog ---------- */
@@ -567,7 +576,7 @@ function renderSwap() {
   const j = jobById(cur); const box = $("swapBox"); if (!j) return;
   const p = posById(j, posId);
   box.hidden = !p || p.art !== "tausch";
-  if (box.hidden) { $("scanIn").placeholder = p ? (p.art === "auf" ? "NEUES Gerät scannen (Aufbau)" : "ALTES Gerät scannen (Abbau)") : "Zuerst Platz wählen"; return; }
+  if (box.hidden) { $("scanIn").placeholder = p ? (p.art === "auf" ? "Neues Gerät scannen oder Liste einfügen" : "Altes Gerät scannen oder Liste einfügen") : "Zuerst Platz wählen"; return; }
   const g = curSwap(j), st = nextStep(j), r = RATIO(p.tausch), n = g ? g.no : swapsOf(j.id).length + 1, step = $("swapStep");
   if (st === "done") { step.className = "swapstep done"; step.textContent = "✓ Alle Austausche an diesem Platz fertig"; }
   else if (!g || st === "alt" && (!g || g.neu.length)) { step.className = "swapstep alt"; step.textContent = "Austausch " + (g && !g.neu.length ? g.no : n) + " · ① ALTES Gerät scannen" + (r.alt > 1 ? " (" + (g && !g.neu.length ? g.alt.length : 0) + "/" + r.alt + ")" : ""); }
@@ -616,31 +625,43 @@ function renderScan(first) {
 $("siteSel").addEventListener("change", e => { const j = jobById(cur); siteId = e.target.value; ls.set("site:" + cur, siteId); swap = null; saveSwap(); const p = firstOpenPos(j, siteId); posId = p ? p.id : null; if (p) ls.set("pos:" + cur, p.id); renderScan(false); setMsg("Standort gewechselt." + (p ? " Platz: " + posLabel(p) : ""), ""); refocus(); });
 $("lsSite").onclick = () => { listAll = false; $("lsSite").setAttribute("aria-pressed", true); $("lsAll").setAttribute("aria-pressed", false); renderScan(false); };
 $("lsAll").onclick = () => { listAll = true; $("lsSite").setAttribute("aria-pressed", false); $("lsAll").setAttribute("aria-pressed", true); renderScan(false); };
-function setMsg(t, cls) { const m = $("scanMsg"); m.className = "msg " + (cls || ""); m.textContent = t; void m.offsetWidth; if (cls) m.classList.add("flash"); }
+function setMsg(t, cls) { if (bulk) { bulk.last = t; return; } const m = $("scanMsg"); m.className = "msg " + (cls || ""); m.textContent = t; void m.offsetWidth; if (cls) m.classList.add("flash"); }
 function refocus() { if (matchMedia("(pointer:fine)").matches && view === "scan") setTimeout(() => $("scanIn").focus({ preventScroll: true }), 30); }
+let collapsed = new Set();
 function renderRows(j) {
-  const rows = scansOf(j.id, listAll ? null : siteId).reverse(); const tb = $("scanRows"); tb.innerHTML = "";
-  $("listCount").textContent = rows.length ? "· " + rows.length : "";
-  $("scanEmpty").hidden = rows.length > 0; $("scanEmpty").textContent = listAll ? "Noch nichts erfasst." : "Noch nichts erfasst an diesem Standort.";
-  const total = rows.length; const siteNo = id => j.sites.findIndex(s => s.id === id) + 1;
+  const all = scansOf(j.id, listAll ? null : siteId); const tb = $("scanRows"); tb.innerHTML = "";
+  $("listCount").textContent = all.length ? "· " + all.length : "";
+  $("scanEmpty").hidden = all.length > 0; $("scanEmpty").textContent = listAll ? "Noch nichts erfasst." : "Noch nichts erfasst an diesem Standort.";
+  const siteNo = id => j.sites.findIndex(s => s.id === id) + 1;
   const swapNo = {}; swapsOf(j.id).forEach(g => swapNo[g.grp] = g.no);
-  rows.forEach((s, i) => {
-    const ty = devType(s.asset), d = dirOf(s);
-    const canDel = canEdit(j, s);
-    const del = canDel ? h("button", { class: "x" + (armed === s.id ? " arm" : ""), type: "button", onclick: () => {
-      if (armed !== s.id) { armed = s.id; renderRows(j); setTimeout(() => { if (armed === s.id) { armed = null; renderRows(j); } }, 3000); return; }
-      armed = null; removeScan(j, s);
-    } }, armed === s.id ? "Sicher?" : "Löschen") : "";
-    const extra = [s.cond && s.cond !== "ok" ? (s.cond === "defekt" ? "Defekt" : "Spuren") : "", s.note].filter(Boolean).join(" · ");
-    const ort = [listAll && j.sites.length > 1 ? "Standort " + siteNo(s.site_id) : "", locText(s), s.wo].filter(Boolean).join(" · ");
-    const artTag = s.art === "tausch" ? "Tausch " + (swapNo[s.grp] || "") + (d === "ab" ? " ↓" : " ↑") : (d === "ab" ? "Abbau" : "Aufbau");
-    const ed = canEdit(j, s) ? () => editScan(j, s) : null;
-    tb.append(h("tr", { class: (s.id === freshId ? "fresh " : "") + (s.pending ? "pending " : "") + (ed ? "click" : ""), title: ed ? "Antippen zum Bearbeiten" : null },
-      h("td", { class: "n", onclick: ed }, String(total - i)), h("td", { class: "a", onclick: ed }, s.asset,
-        h("span", { class: "show-s tags" }, h("span", { class: "tag" + (ty ? "" : " unk") }, ty || "Unbekannt"), h("span", { class: "tag " + d }, artTag)),
-        ort ? h("span", { class: "loc" }, "📍 " + ort) : h("span", { class: "loc", style: "color:var(--muted);font-weight:500" }, "📍 kein Platz"), extra ? h("small", null, extra) : null),
-      h("td", { class: "hide-s" }, h("span", { class: "tag" + (ty ? "" : " unk") }, ty || "Unbekannt")), h("td", { class: "hide-s" }, h("span", { class: "tag " + d }, artTag)),
-      h("td", { class: "b hide-s" }, (s.by || "").split(" ")[0]), h("td", null, del)));
+  // nach Raum gruppieren, zuletzt bearbeiteter Raum oben
+  const groups = new Map();
+  all.forEach(s => { const k = [s.site_id, s.etage || "", s.raum || "", s.buero || ""].join("|"); const g = groups.get(k) || { k, s0: s, items: [], last: 0 }; g.items.push(s); g.last = Math.max(g.last, s.ts); groups.set(k, g); });
+  const list = [...groups.values()].sort((a, b) => b.last - a.last);
+  const cols = 6;
+  list.forEach(g => {
+    const s0 = g.s0, open = !collapsed.has(g.k);
+    const cnt = {}; g.items.forEach(x => { const t = (devType(x.asset) || "Unbekannt") + (dirOf(x) === "ab" ? " alt" : ""); cnt[t] = (cnt[t] || 0) + 1; });
+    const title = [listAll && j.sites.length > 1 ? "Standort " + siteNo(s0.site_id) : "", locText(s0) || "ohne Raum"].filter(Boolean).join(" · ");
+    tb.append(h("tr", { class: "grp" + (open ? "" : " shut"), onclick: () => { open ? collapsed.add(g.k) : collapsed.delete(g.k); renderRows(j); } },
+      h("td", { colspan: String(cols) }, h("div", { class: "gh" }, h("span", { class: "gt" }, (open ? "▾ " : "▸ ") + "📍 " + title),
+        h("span", { class: "gc" }, Object.entries(cnt).map(([t, n]) => n + " " + t).join(" · "))))));
+    if (!open) return;
+    g.items.sort((a, b) => b.ts - a.ts).forEach((s, i) => {
+      const ty = devType(s.asset), d = dirOf(s);
+      const del = canEdit(j, s) ? h("button", { class: "x" + (armed === s.id ? " arm" : ""), type: "button", onclick: () => {
+        if (armed !== s.id) { armed = s.id; renderRows(j); setTimeout(() => { if (armed === s.id) { armed = null; renderRows(j); } }, 3000); return; }
+        armed = null; removeScan(j, s);
+      } }, armed === s.id ? "Sicher?" : "Löschen") : "";
+      const extra = [s.place && "Platz " + s.place, s.cond && s.cond !== "ok" ? (s.cond === "defekt" ? "Defekt" : "Spuren") : "", s.note, s.wo].filter(Boolean).join(" · ");
+      const artTag = s.art === "tausch" ? "Tausch " + (swapNo[s.grp] || "") + (d === "ab" ? " ↓" : " ↑") : (d === "ab" ? "Abbau" : "Aufbau");
+      const ed = canEdit(j, s) ? () => editScan(j, s) : null;
+      tb.append(h("tr", { class: (s.id === freshId ? "fresh " : "") + (s.pending ? "pending " : "") + (ed ? "click" : ""), title: ed ? "Antippen zum Bearbeiten" : null },
+        h("td", { class: "n", onclick: ed }, String(g.items.length - i)), h("td", { class: "a", onclick: ed }, s.asset,
+          h("span", { class: "show-s tags" }, h("span", { class: "tag" + (ty ? "" : " unk") }, ty || "Unbekannt"), h("span", { class: "tag " + d }, artTag)), extra ? h("small", null, extra) : null),
+        h("td", { class: "hide-s" }, h("span", { class: "tag" + (ty ? "" : " unk") }, ty || "Unbekannt")), h("td", { class: "hide-s" }, h("span", { class: "tag " + d }, artTag)),
+        h("td", { class: "b hide-s" }, (s.by || "").split(" ")[0]), h("td", null, del)));
+    });
   });
 }
 function removeScan(j, s) {
@@ -651,8 +672,9 @@ function removeScan(j, s) {
   if (swap && s.grp === swap.grp && !swapsOf(j.id).some(g => g.grp === swap.grp)) { swap = null; saveSwap(); }
   renderScan(false); toast("Gelöscht: " + s.asset);
 }
+$("lEtage").addEventListener("blur", () => { const v = normEtage($("lEtage").value); if (v !== $("lEtage").value) { $("lEtage").value = v; saveLoc(); } });
 function details() { const p = posById(jobById(cur), posId) || {};
-  if (p.frei) return { etage: $("lEtage").value.trim(), raum: $("lRaum").value.trim(), buero: $("lBuero").value.trim(), place: $("lPlatz").value.trim(), cond, note: $("dNote").value.trim() };
+  if (p.frei) return { etage: normEtage($("lEtage").value), raum: $("lRaum").value.trim(), buero: $("lBuero").value.trim(), place: $("lPlatz").value.trim(), cond, note: $("dNote").value.trim() };
   return { etage: p.etage || "", raum: p.raum || "", buero: p.buero || "", place: p.place || "", cond, note: $("dNote").value.trim() }; }
 const LOCF = [["etage", "lEtage", "Etage"], ["raum", "lRaum", "Raum"]];
 function missingLoc() { return LOCF.filter(([, id]) => !$(id).value.trim()); }
@@ -690,7 +712,7 @@ function editScan(j, s) {
     const err = planError(j, p, dirOf(s), asset, s.id); if (err) { ask("Geht so nicht", err, [{ label: "OK", cls: "primary" }]); beepBad(); return; }
     const upd = { id: s.id, asset, site_id: p.site_id, pos_id: p.id, cond: ec, note: $("e_note").value.trim() };
     let loc = { etage: p.etage, raum: p.raum, buero: p.buero, place: p.place };
-    if (p.frei) { loc = { etage: $("e_etage").value.trim(), raum: $("e_raum").value.trim(), buero: $("e_buero").value.trim(), place: $("e_place").value.trim() };
+    if (p.frei) { loc = { etage: normEtage($("e_etage").value), raum: $("e_raum").value.trim(), buero: $("e_buero").value.trim(), place: $("e_place").value.trim() };
       if (!loc.etage || !loc.raum) { toast("Etage und Raum sind Pflicht"); beepBad(); return; } Object.assign(upd, loc); }
     const d = jd(j.id), rec = d.scans[s.id]; if (!rec) return;
     Object.assign(rec, upd, loc, { wo: p.wo }); ["buero", "place", "note", "wo"].forEach(k => { if (!rec[k]) delete rec[k]; }); if (rec.cond === "ok") delete rec.cond;
@@ -707,6 +729,7 @@ function addAsset(raw) {
   const p = posById(j, posId);
   if (!p) { setMsg("Zuerst einen Platz wählen.", "bad"); beepBad(); posOpen = true; renderPos(j); return false; }
   if (a.length < 4) { setMsg("«" + a + "» ist zu kurz für eine Asset-ID.", "bad"); beepBad(); return false; }
+  if (!/^[A-Za-z0-9._-]{4,24}$/.test(a)) { setMsg("«" + (a.length > 30 ? a.slice(0, 30) + "…" : a) + "» ist keine gültige Asset-ID.", "bad"); beepBad(); return false; }
   if (p.frei) { const ml = missingLoc(); if (ml.length) { ml.forEach(([, id]) => $(id).classList.add("invalid")); setMsg("Zuerst " + ml.map(([, , l]) => l).join(" und ") + " eintragen, dann nochmals scannen.", "bad"); beepBad(); $(ml[0][1]).focus(); return false; } }
   let dir = p.art === "auf" ? "auf" : "ab", grp = null, art = p.art === "tausch" ? "tausch" : "einzeln";
   if (p.art === "tausch") {
@@ -743,11 +766,29 @@ function addAsset(raw) {
     else setMsg("✓ " + a + " · Alle Plätze an diesem Standort sind erledigt 🎉", "ok");
     tone(2093, .09, .12);
   }
-  renderScan(false);
-  toast(lbl + ": " + a, "Rückgängig", () => removeScan(j, rec));
+  if (!bulk) { renderScan(false); toast(lbl + ": " + a, "Rückgängig", () => removeScan(j, rec)); }
   return true;
 }
-$("scanForm").addEventListener("submit", e => { e.preventDefault(); if (addAsset($("scanIn").value)) $("scanIn").value = ""; else $("scanIn").select(); refocus(); });
+// Liste einfügen (Komma, Strichpunkt, Leerzeichen oder Zeilenumbruch) → jede ID einzeln erfassen
+function addMany(text) {
+  const ids = String(text || "").split(/[\s,;]+/).map(x => x.trim()).filter(Boolean);
+  if (ids.length <= 1) return addAsset(ids[0] || "");
+  const j = jobById(cur), p = j && posById(j, posId);
+  if (p && p.art === "tausch") { setMsg("Eine Liste einfügen geht nur bei Aufbau oder Abbau. Beim Austausch alt und neu einzeln scannen.", "bad"); beepBad(); return false; }
+  if (p && p.frei && missingLoc().length) return addAsset(ids[0]);
+  bulk = { ok: 0, bad: [] };
+  ids.forEach(id => { bulk.last = ""; if (addAsset(id)) bulk.ok++; else bulk.bad.push([id, bulk.last]); });
+  const r = bulk; bulk = null;
+  renderScan(false);
+  const pk = $("picks"); pk.innerHTML = ""; pk.hidden = !r.bad.length;
+  if (r.bad.length) pk.append(h("div", { class: "hint", style: "margin:0;color:var(--bad)" }, "Nicht erfasst:"), ...r.bad.map(([id, why]) => h("div", { class: "hint", style: "margin:0" }, id + " – " + (why || "abgelehnt"))));
+  setMsg((r.ok ? "✓ " : "") + r.ok + " von " + ids.length + " Geräten erfasst" + (r.bad.length ? " · " + r.bad.length + " abgelehnt (siehe unten)" : ""), !r.ok ? "bad" : r.bad.length ? "warn" : "ok");
+  r.bad.length ? beepWarn() : beepOk();
+  if (r.ok) toast(r.ok + " Geräte erfasst");
+  return r.ok > 0;
+}
+$("scanForm").addEventListener("submit", e => { e.preventDefault(); if (addMany($("scanIn").value)) $("scanIn").value = ""; else $("scanIn").select(); refocus(); });
+$("scanIn").addEventListener("paste", e => { const t = (e.clipboardData || window.clipboardData).getData("text") || ""; if (/[\s,;]/.test(t.trim())) { e.preventDefault(); if (addMany(t)) $("scanIn").value = ""; refocus(); } });
 // Handscanner ohne Enter: schnelle Zeichenfolge automatisch übernehmen
 (function () {
   const inp = $("scanIn"); let t = null, first = 0, len0 = 0;
@@ -757,7 +798,7 @@ $("scanForm").addEventListener("submit", e => { e.preventDefault(); if (addAsset
     if (!first || now - first > 1500) { first = now; len0 = 0; }
     const burst = v.length - len0 >= 5 && now - first < 300;
     const pasted = e.inputType === "insertFromPaste" || e.inputType === "insertReplacementText";
-    if (burst || pasted) t = setTimeout(() => { first = 0; if (addAsset(inp.value)) inp.value = ""; else inp.select(); }, 180);
+    if (burst || pasted) t = setTimeout(() => { first = 0; if (addMany(inp.value)) inp.value = ""; else inp.select(); }, 180);
   });
   inp.addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeout(t); first = 0; } });
 })();
@@ -929,7 +970,7 @@ function posEditor(s, i) {
   const save = (andNext) => {
     const miss = posMissing(p);
     if (miss.length) { miss.forEach(([k]) => { if (k === "ab" || k === "auf") document.querySelectorAll('[data-pe="' + k + '"]').forEach(x => x.classList.add("invalid")); else $("pe_" + k + i) && $("pe_" + k + i).classList.add("invalid"); }); toast("Fehlt: " + miss.map(([, l]) => l).join(", ")); beepBad(); return; }
-    ["ab", "auf"].forEach(d => { if (!dirs.includes(d)) p.soll[d] = {}; });
+    ["ab", "auf"].forEach(d => { if (!dirs.includes(d)) p.soll[d] = {}; }); if (p.etage) p.etage = normEtage(p.etage);
     const k = s.plaetze.findIndex(x => x.id === p.id); const clean2 = { ...p, soll: JSON.parse(JSON.stringify(p.soll)) };
     if (k >= 0) s.plaetze[k] = clean2; else s.plaetze.push(clean2);
     if (andNext) { const nx = { ...JSON.parse(JSON.stringify(clean2)), id: uuid() }; const num = /^(.*?)(\d+)$/.exec(nx.place || ""); nx.place = num ? num[1] + (+num[2] + 1) : ""; s._pe = nx; }

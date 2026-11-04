@@ -196,6 +196,11 @@ textarea{resize:vertical}
 .checkrow{display:flex;flex-wrap:wrap;gap:8px 16px}
 .checkrow label{display:flex;align-items:center;gap:8px;font-size:15px;cursor:pointer}
 .checkrow input{width:20px;height:20px;accent-color:var(--accent)}
+.tbl tr.grp td{background:var(--surface-2);padding:9px 8px;cursor:pointer;border-bottom:1px solid var(--line)}
+.tbl tr.grp .gh{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
+.tbl tr.grp .gt{font-weight:750;font-size:14px}
+.tbl tr.grp .gc{font-size:12.5px;color:var(--muted);font-weight:600}
+.tbl tr.grp.shut td{opacity:.85}
 .tbl tr.click td{cursor:pointer}
 .tbl tr.click:hover td{background:var(--surface-2)}
 .tbl td.a .loc{display:block;font-family:var(--f);font-weight:600;color:var(--fg);font-size:12.5px;white-space:normal}
