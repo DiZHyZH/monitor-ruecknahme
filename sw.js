@@ -1,5 +1,5 @@
 // Offline-Cache für Monitor-Rücknahme. Bei Updates VERSION hochzählen.
-const VERSION = "ruecknahme-v26";
+const VERSION = "ruecknahme-v27";
 const FILES = ["./", "index.html", "app.css", "app.js", "vendor/zxing.min.js", "vendor/xlsx.mini.min.js", "vendor/qrcode.js",
   "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "dplan-logo.png", "anleitung.html", "installieren.html"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
